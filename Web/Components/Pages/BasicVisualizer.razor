@@ -1,0 +1,139 @@
+﻿@page "/basicvisualizer"
+@inject SimulationService Sim
+@inject IJSRuntime JS
+@using System.Timers
+@using Web.Data
+@using Web.Services
+@implements IDisposable
+
+<div class="container text-center">
+    <h3>MPC Path Tracking</h3>
+
+    <div class="alert alert-info py-1">
+        <strong>Controls:</strong> Drag red obstacles to move them. Click "Add Mode" then the canvas to place new ones.
+    </div>
+
+    <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000; background: #f8f9fa; cursor: crosshair;"></canvas>
+
+    <div class="mt-3">
+        <button class="btn btn-success" @onclick="Start">Start</button>
+        <button class="btn btn-danger" @onclick="Stop">Stop</button>
+        <button class="btn btn-secondary" @onclick="Reset">Reset</button>
+        <button class="btn @(_isAddingNew ? "btn-warning" : "btn-info")" @onclick="ToggleAddMode">
+            @(_isAddingNew ? "Cancel Add" : "Add Obstacle Mode")
+        </button>
+    </div>
+</div>
+
+@code {
+    private Timer? _timer;
+    private CarStateDTO? _currentCar;
+    private DotNetObjectReference<BasicVisualizer>? _objRef;
+
+    private int _draggedIdx = -1;
+    private bool _isAddingNew = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize the JS listeners and pass a reference to this C# object
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initCanvasEvents", "simCanvas", _objRef);
+
+            // Draw the initial state (obstacles and car) immediately
+            await Tick();
+        }
+    }
+
+    private void Start()
+    {
+        if (_timer != null) return;
+        _timer = new Timer(100);
+        _timer.Elapsed += async (s, e) => await Tick();
+        _timer.Start();
+    }
+
+    private async Task Tick()
+    {
+        // If the simulation is running, move the car. If stopped, just update visuals.
+        if (_timer != null)
+        {
+            _currentCar = Sim.RunStep();
+        }
+
+        var obstacles = Sim.GetObstacles();
+
+        // Pass data to JS for drawing
+        await JS.InvokeVoidAsync("drawSimulation", "simCanvas", _currentCar, obstacles);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task HandleMouseDown(double x, double y)
+    {
+        if (_isAddingNew)
+        {
+            Sim.AddObstacle(x, y);
+            _isAddingNew = false;
+            await Tick(); // Redraw immediately
+            return;
+        }
+
+        var obstacles = Sim.GetObstacles();
+        _draggedIdx = -1;
+
+        // Check if we clicked inside any obstacle (radius check)
+        for (int i = 0; i < obstacles.Count; i++)
+        {
+            double dist = Math.Sqrt(Math.Pow(x - obstacles[i].X, 2) + Math.Pow(y - obstacles[i].Y, 2));
+            if (dist < obstacles[i].Radius)
+            {
+                _draggedIdx = i;
+                break;
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleMouseMove(double x, double y)
+    {
+        if (_draggedIdx != -1)
+        {
+            // Update the position in the service
+            Sim.UpdateObstaclePosition(_draggedIdx, x, y);
+
+            // Force a redraw so the movement looks smooth even when the simulation is paused
+            await Tick();
+        }
+    }
+
+    [JSInvokable]
+    public void HandleMouseUp()
+    {
+        _draggedIdx = -1;
+    }
+
+    private void ToggleAddMode() => _isAddingNew = !_isAddingNew;
+
+    private void Stop()
+    {
+        _timer?.Stop();
+        _timer = null;
+    }
+
+    private void Reset()
+    {
+        Stop();
+        Sim.Reset();
+        _currentCar = null;
+        StateHasChanged();
+        _ = Tick();
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        _objRef?.Dispose();
+    }
+}
