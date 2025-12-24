@@ -19,7 +19,7 @@ namespace Web.Services
         };
         private double[,] _R = {
             { 1, 0 },
-            { 0, 1000 }
+            { 0, 1 }
         };
 
         // Your default starting configuration

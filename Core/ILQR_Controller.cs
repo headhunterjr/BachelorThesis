@@ -46,9 +46,21 @@
                         B_list.Add(Bt);
                     }
 
+                    double targetVelocity = 10.0;
+                    double distToGoal = Math.Sqrt(Math.Pow(x_trajectory[t][0], 2) + Math.Pow(x_trajectory[t][1], 2));
+
+                    // Slow down only when very close to the destination (e.g., 3 meters)
+                    if (distToGoal < 5.0) targetVelocity = 0.0;
+
+                    double[] xTarget = { 0, 0, targetVelocity, 0 };
+
+                    // 2. Calculate the State Error (x - x_target)
+                    double[] xError = new double[4];
+                    for (int i = 0; i < 4; i++) xError[i] = x_trajectory[t][i] - xTarget[i];
+
                     // Derivatives of Cost (Q, q) including ALL Obstacles
                     double[,] Q_total = (double[,])Q.Clone();
-                    double[,] xVec = Helpers.ToColumnVector(x_trajectory[t]);
+                    double[,] xVec = Helpers.ToColumnVector(xError);
                     double[,] q_std = Helpers.MultiplyMatrices(Q, xVec);
                     double[] q_total = { 2 * q_std[0, 0], 2 * q_std[1, 0], 2 * q_std[2, 0], 2 * q_std[3, 0] };
 
@@ -134,8 +146,11 @@
             double cost = 0;
             for (int t = 0; t < X.Count; t++)
             {
-                double[,] xVec = Helpers.ToColumnVector(X[t]);
-                cost += Helpers.VectorQuadForm(xVec, Q);
+                double targetVel = (Math.Sqrt(X[t][0] * X[t][0] + X[t][1] * X[t][1]) < 5.0) ? 0 : 10.0;
+                double[] xError = { X[t][0], X[t][1], X[t][2] - targetVel, X[t][3] };
+
+                double[,] errVec = Helpers.ToColumnVector(xError);
+                cost += Helpers.VectorQuadForm(errVec, Q);
 
                 // Sum costs of all obstacles
                 foreach (var obs in obstacles)
