@@ -77,4 +77,14 @@ window.initCanvasEvents = (canvasId, dotNetHelper) => {
 
         dotNetHelper.invokeMethodAsync('HandleMouseMove', mouseX, mouseY);
     };
+
+    canvas.oncontextmenu = (e) => {
+        e.preventDefault(); // Stop the actual right-click menu
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = toMeters(e.clientX - rect.left, centerX, scale);
+        const mouseY = -toMeters(e.clientY - rect.top, centerY, scale);
+
+        // Tell C# to try and delete an obstacle at this location
+        dotNetHelper.invokeMethodAsync('HandleRightClick', mouseX, mouseY);
+    };
 };

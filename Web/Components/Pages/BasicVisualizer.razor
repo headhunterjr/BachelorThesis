@@ -6,68 +6,107 @@
 @using Web.Services
 @implements IDisposable
 
-<div class="container text-center">
-    <h3>MPC Path Tracking</h3>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-9 text-center p-3">
+            <h3>MPC Path Tracking</h3>
+            <div class="alert alert-info py-1 mb-2">
+                <small><strong>Drag</strong> obstacles to move | <strong>Right-Click</strong> an obstacle to delete it.</small>
+            </div>
 
-    <div class="alert alert-info py-1">
-        <strong>Controls:</strong> Drag red obstacles to move them. Click "Add Mode" then the canvas to place new ones.
-    </div>
+            <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000; background: #f8f9fa; cursor: crosshair;"></canvas>
 
-    <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000; background: #f8f9fa; cursor: crosshair;"></canvas>
+            <div class="mt-3">
+                <button class="btn btn-success" @onclick="Start">Start</button>
+                <button class="btn btn-danger" @onclick="Stop">Stop</button>
+                <button class="btn btn-secondary" @onclick="Reset">Reset</button>
 
-    <div class="mt-3">
-        <button class="btn btn-success" @onclick="Start">Start</button>
-        <button class="btn btn-danger" @onclick="Stop">Stop</button>
-        <button class="btn btn-secondary" @onclick="Reset">Reset</button>
-        <button class="btn @(_isAddingNew ? "btn-warning" : "btn-info")" @onclick="ToggleAddMode">
-            @(_isAddingNew ? "Cancel Add" : "Add Obstacle Mode")
-        </button>
-    </div>
-</div>
+                <div class="btn-group ms-3">
+                    <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-info")" @onclick="SetAddObstacleMode">
+                        @(_mode == InteractionMode.AddObstacle ? "Cancel Add" : "Add Obstacle")
+                    </button>
+                    <button class="btn @(_mode == InteractionMode.SetStart ? "btn-warning" : "btn-primary")" @onclick="SetStartPositionMode">
+                        @(_mode == InteractionMode.SetStart ? "Cancel Move" : "Move Car")
+                    </button>
+                </div>
+                <button class="btn btn-outline-danger ms-2" @onclick="ClearObstacles">Clear All Obstacles</button>
+            </div>
+        </div>
 
-<div class="row">
-    <div class="col-md-9">
-        <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000; background: #f8f9fa; cursor: crosshair;"></canvas>
-    </div>
+        <div class="col-md-3 bg-light vh-100 border-start p-4 shadow-sm text-start" style="overflow-y: auto;">
+            <h4 class="mb-4">Control Panel</h4>
 
-    <div class="col-md-3 text-start bg-light p-3 border">
-        <h5>Algorithm Settings</h5>
+            <section class="mb-4">
+                <h6 class="text-primary fw-bold">Initial State (For "Move Car")</h6>
+                <div class="mb-3">
+                    <label class="form-label small">Initial Velocity: <strong>@Sim.InitialVelocity.ToString("F1") m/s</strong></label>
+                    <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="Sim.InitialVelocity" @bind-value:event="oninput" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Initial Angle: <strong>@Sim.InitialAngle.ToString("F2") rad</strong></label>
+                    <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="Sim.InitialAngle" @bind-value:event="oninput" />
+                </div>
+            </section>
 
-        <label>Horizon (Steps): @Sim.Horizon</label>
-        <input type="range" class="form-range" min="5" max="100" step="1" @bind-value="Sim.Horizon" @bind-value:event="oninput" />
+            <hr />
 
-        <label>Time Step (dt): @Sim.Dt.ToString("F2")s</label>
-        <input type="range" class="form-range" min="0.05" max="0.5" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
+            <section class="mb-4">
+                <h6 class="text-secondary fw-bold">MPC Algorithm</h6>
+                <div class="mb-3">
+                    <label class="form-label small">Horizon: <strong>@Sim.Horizon</strong></label>
+                    <input type="range" class="form-range" min="5" max="100" step="1" @bind-value="Sim.Horizon" @bind-value:event="oninput" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Time Step (dt): <strong>@Sim.Dt.ToString("F2")s</strong></label>
+                    <input type="range" class="form-range" min="0.05" max="0.5" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
+                </div>
+            </section>
 
-        <hr />
-        <h5>Obstacle Settings</h5>
-        <p><small>Changes apply to <i>new</i> obstacles</small></p>
+            <hr />
 
-        <label>Radius: @Sim.ObstacleRadius.ToString("F1")m</label>
-        <input type="range" class="form-range" min="1" max="15" step="0.5" @bind-value="Sim.ObstacleRadius" @bind-value:event="oninput" />
+            <section class="mb-4">
+                <h6 class="text-danger fw-bold">Obstacle Parameters</h6>
+                <div class="mb-3">
+                    <label class="form-label small">New Radius: <strong>@Sim.ObstacleRadius.ToString("F1")m</strong></label>
+                    <input type="range" class="form-range" min="1" max="15" step="0.5" @bind-value="Sim.ObstacleRadius" @bind-value:event="oninput" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Weight: <strong>@Sim.ObstacleWeight.ToString("N0")</strong></label>
+                    <input type="range" class="form-range" min="1000" max="50000" step="1000" @bind-value="Sim.ObstacleWeight" @bind-value:event="oninput" />
+                </div>
+            </section>
 
-        <label>Avoidance Weight: @Sim.ObstacleWeight.ToString("N0")</label>
-        <input type="range" class="form-range" min="1000" max="50000" step="1000" @bind-value="Sim.ObstacleWeight" @bind-value:event="oninput" />
+            @if (_currentCar != null)
+            {
+                <div class="card bg-dark text-white p-2 mt-auto">
+                    <h6 class="mb-1 small">Live Telemetry</h6>
+                    <code class="text-info" style="font-size: 0.75rem;">
+                        X: @(_currentCar.X.ToString("F2"))<br />
+                        Y: @(_currentCar.Y.ToString("F2"))<br />
+                        V: @(_currentCar.Velocity.ToString("F2"))<br />
+                        A: @(_currentCar.Theta.ToString("F2"))
+                    </code>
+                </div>
+            }
+        </div>
     </div>
 </div>
 
 @code {
+    private enum InteractionMode { None, AddObstacle, SetStart }
+    private InteractionMode _mode = InteractionMode.None;
+
     private Timer? _timer;
     private CarStateDTO? _currentCar;
     private DotNetObjectReference<BasicVisualizer>? _objRef;
-
     private int _draggedIdx = -1;
-    private bool _isAddingNew = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Initialize the JS listeners and pass a reference to this C# object
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initCanvasEvents", "simCanvas", _objRef);
-
-            // Draw the initial state (obstacles and car) immediately
             await Tick();
         }
     }
@@ -82,15 +121,10 @@
 
     private async Task Tick()
     {
-        // If the simulation is running, move the car. If stopped, just update visuals.
-        if (_timer != null)
-        {
-            _currentCar = Sim.RunStep();
-        }
+        if (_timer != null) _currentCar = Sim.RunStep();
+        else _currentCar = Sim.GetCurrentState();
 
         var obstacles = Sim.GetObstacles();
-
-        // Pass data to JS for drawing
         await JS.InvokeVoidAsync("drawSimulation", "simCanvas", _currentCar, obstacles);
         await InvokeAsync(StateHasChanged);
     }
@@ -98,18 +132,24 @@
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
-        if (_isAddingNew)
+        if (_mode == InteractionMode.AddObstacle)
         {
             Sim.AddObstacle(x, y);
-            _isAddingNew = false;
-            await Tick(); // Redraw immediately
+            _mode = InteractionMode.None;
+            await Tick();
+            return;
+        }
+
+        if (_mode == InteractionMode.SetStart)
+        {
+            Sim.SetCarPosition(x, y);
+            _mode = InteractionMode.None;
+            await Tick();
             return;
         }
 
         var obstacles = Sim.GetObstacles();
         _draggedIdx = -1;
-
-        // Check if we clicked inside any obstacle (radius check)
         for (int i = 0; i < obstacles.Count; i++)
         {
             double dist = Math.Sqrt(Math.Pow(x - obstacles[i].X, 2) + Math.Pow(y - obstacles[i].Y, 2));
@@ -122,44 +162,40 @@
     }
 
     [JSInvokable]
+    public async Task HandleRightClick(double x, double y)
+    {
+        var obstacles = Sim.GetObstacles();
+        for (int i = 0; i < obstacles.Count; i++)
+        {
+            double dist = Math.Sqrt(Math.Pow(x - obstacles[i].X, 2) + Math.Pow(y - obstacles[i].Y, 2));
+            if (dist < obstacles[i].Radius)
+            {
+                Sim.RemoveObstacle(i);
+                await Tick();
+                break;
+            }
+        }
+    }
+
+    [JSInvokable]
     public async Task HandleMouseMove(double x, double y)
     {
         if (_draggedIdx != -1)
         {
-            // Update the position in the service
             Sim.UpdateObstaclePosition(_draggedIdx, x, y);
-
-            // Force a redraw so the movement looks smooth even when the simulation is paused
             await Tick();
         }
     }
 
     [JSInvokable]
-    public void HandleMouseUp()
-    {
-        _draggedIdx = -1;
-    }
+    public void HandleMouseUp() => _draggedIdx = -1;
 
-    private void ToggleAddMode() => _isAddingNew = !_isAddingNew;
+    private void SetAddObstacleMode() => _mode = (_mode == InteractionMode.AddObstacle) ? InteractionMode.None : InteractionMode.AddObstacle;
+    private void SetStartPositionMode() => _mode = (_mode == InteractionMode.SetStart) ? InteractionMode.None : InteractionMode.SetStart;
 
-    private void Stop()
-    {
-        _timer?.Stop();
-        _timer = null;
-    }
+    private async Task ClearObstacles() { Sim.ClearAllObstacles(); await Tick(); }
+    private void Stop() { _timer?.Stop(); _timer = null; }
+    private void Reset() { Stop(); Sim.Reset(); _currentCar = null; _ = Tick(); }
 
-    private void Reset()
-    {
-        Stop();
-        Sim.Reset();
-        _currentCar = null;
-        StateHasChanged();
-        _ = Tick();
-    }
-
-    public void Dispose()
-    {
-        _timer?.Dispose();
-        _objRef?.Dispose();
-    }
+    public void Dispose() { _timer?.Dispose(); _objRef?.Dispose(); }
 }

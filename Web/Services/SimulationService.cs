@@ -5,22 +5,30 @@ namespace Web.Services
 {
     public class SimulationService
     {
-        // The "Real" state of the car in the world
-        private double[] _realCarState = { -50.0, -15.0, 10.0, 0.5 };
+        // The "Real" state of the car in the world: [X, Y, Velocity, Angle]
+        private double[] _realCarState = new double[4];
 
         // The Obstacles in the world
         private List<Obstacle> _obstacles = new();
 
         private double[,] _Q = {
-            { 10, 0, 0, 0 }, 
-            { 0, 10, 0, 0 }, 
-            { 0, 0, 100, 0 }, 
+            { 10, 0, 0, 0 },
+            { 0, 10, 0, 0 },
+            { 0, 0, 100, 0 },
             { 0, 0, 0, 10 }
         };
-        private double[,] _R = { 
-            { 1, 0 }, 
-            { 0, 1000 } 
+        private double[,] _R = {
+            { 1, 0 },
+            { 0, 1000 }
         };
+
+        // Your default starting configuration
+        public double[] StartPoint { get; set; } = { 0.0, 0.0, 0.0, 0.0 };
+        public double[] TargetPoint { get; set; } = { 0.0, 0.0 };
+
+        // These properties now act as "Live" sliders for the next time you move the car
+        public double InitialVelocity { get; set; } = 10.0;
+        public double InitialAngle { get; set; } = 0.5;
 
         public int Horizon { get; set; } = 40;
         public double Dt { get; set; } = 0.1;
@@ -29,19 +37,15 @@ namespace Web.Services
 
         public void Reset()
         {
-            _realCarState = new double[] { -50.0, -15.0, 10.0, 0.5 };
+            // Reset to the default StartPoint array
+            _realCarState = new double[] { StartPoint[0], StartPoint[1], StartPoint[2], StartPoint[3] };
         }
 
-        // This method runs one step of the MPC loop
         public CarStateDTO RunStep()
         {
-            // 1. Solve for the next move
             double[] u = ILQR_Controller.Solve(_realCarState, _Q, _R, _obstacles, Horizon, maxIterations: 5, Dt);
-
-            // 2. Apply the physics (move the car)
             _realCarState = PhysicsEngine.Step(_realCarState, u, Dt);
 
-            // 3. Package data for the Frontend
             return new CarStateDTO
             {
                 X = _realCarState[0],
@@ -66,6 +70,41 @@ namespace Web.Services
             {
                 _obstacles[index].X = x;
                 _obstacles[index].Y = y;
+            }
+        }
+
+        public CarStateDTO GetCurrentState()
+        {
+            return new CarStateDTO
+            {
+                X = _realCarState[0],
+                Y = _realCarState[1],
+                Velocity = _realCarState[2],
+                Theta = _realCarState[3]
+            };
+        }
+
+        public void SetCarPosition(double x, double y)
+        {
+            // This is where we sync the sliders and the click
+            // X and Y come from the mouse click
+            _realCarState[0] = x;
+            _realCarState[1] = y;
+            // Velocity and Angle come from your sidebar sliders
+            _realCarState[2] = InitialVelocity;
+            _realCarState[3] = InitialAngle;
+        }
+
+        public void ClearAllObstacles()
+        {
+            _obstacles.Clear();
+        }
+
+        public void RemoveObstacle(int index)
+        {
+            if (index >= 0 && index < _obstacles.Count)
+            {
+                _obstacles.RemoveAt(index);
             }
         }
     }
