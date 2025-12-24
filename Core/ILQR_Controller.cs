@@ -4,10 +4,9 @@
     {
         // === MAIN SOLVER ===
         // Now accepts a list of obstacles
-        public static double[] Solve(double[] xInit, double[,] Q, double[,] R, List<Obstacle> obstacles, int horizon, int maxIterations)
+        public static double[] Solve(double[] xInit, double[,] Q, double[,] R, List<Obstacle> obstacles, int horizon, int maxIterations, double dt)
         {
             int nInput = 2;
-            double dt = 0.1;
 
             // 1. INITIALIZATION
             List<double[]> u_trajectory = new List<double[]>();
