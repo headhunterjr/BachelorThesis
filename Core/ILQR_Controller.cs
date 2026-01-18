@@ -3,8 +3,7 @@
     public class ILQR_Controller
     {
         // === MAIN SOLVER ===
-        // Now accepts a list of obstacles
-        public static double[] Solve(double[] xInit, double[,] Q, double[,] R, List<Obstacle> obstacles, int horizon, int maxIterations, double dt)
+        public static double[] Solve(double[] xInit, double[,] Q, double[,] R, List<Obstacle> obstacles, int horizon, int maxIterations, double dt, List<double[]>? referencePath = null, double trackWidth = 0)
         {
             int nInput = 2;
 
@@ -26,8 +25,10 @@
                     x_trajectory.Add(xCurrent);
                 }
 
-                double totalCost = CalculateTrajectoryCost(x_trajectory, u_trajectory, Q, R, obstacles);
-                if (totalCost < 1.0) break;
+                double totalCost = CalculateCost(x_trajectory, u_trajectory, Q, R, obstacles, referencePath, trackWidth);
+
+                // Early exit if cost is basically zero
+                if (totalCost < 0.1) break;
 
                 // --- B. LINEARIZE & QUADRATICIZE ---
                 List<double[,]> A_list = new List<double[,]>();
@@ -46,36 +47,64 @@
                         B_list.Add(Bt);
                     }
 
-                    double targetVelocity = 10.0;
-                    double distToGoal = Math.Sqrt(Math.Pow(x_trajectory[t][0], 2) + Math.Pow(x_trajectory[t][1], 2));
-
-                    // Slow down only when very close to the destination (e.g., 3 meters)
-                    if (distToGoal < 5.0) targetVelocity = 0.0;
-
-                    double[] xTarget = { 0, 0, targetVelocity, 0 };
-
-                    // 2. Calculate the State Error (x - x_target)
+                    // --- TARGET SELECTION ---
+                    double[] xTarget;
                     double[] xError = new double[4];
+
+                    if (referencePath != null && referencePath.Count > 0)
+                    {
+                        // === RACING MODE (Path Tracking) ===
+                        int currentIdx = GetClosestPathIndex(x_trajectory[t], referencePath);
+                        // Look ahead logic: Increase the multiplier (e.g., 2.0) to make the car look further ahead
+                        int lookAhead = (int)(t * 2.0);
+                        int targetIdx = (currentIdx + lookAhead) % referencePath.Count;
+                        xTarget = referencePath[targetIdx];
+                    }
+                    else
+                    {
+                        // === PARKING MODE (Point Stabilization) ===
+                        // Default target is (0,0)
+                        double distToGoal = Math.Sqrt(Math.Pow(x_trajectory[t][0], 2) + Math.Pow(x_trajectory[t][1], 2));
+                        // Braking logic: if closer than 5m, target velocity is 0
+                        double targetVel = (distToGoal < 5.0) ? 0.0 : 10.0;
+                        xTarget = new double[] { 0, 0, targetVel, 0 };
+                    }
+
+                    // Calculate Error State
                     for (int i = 0; i < 4; i++) xError[i] = x_trajectory[t][i] - xTarget[i];
 
-                    // Derivatives of Cost (Q, q) including ALL Obstacles
+                    // Normalize Angle Error (Critical for loops!)
+                    while (xError[3] > Math.PI) xError[3] -= 2 * Math.PI;
+                    while (xError[3] < -Math.PI) xError[3] += 2 * Math.PI;
+
+                    // Standard Cost Derivatives (Q, q)
                     double[,] Q_total = (double[,])Q.Clone();
                     double[,] xVec = Helpers.ToColumnVector(xError);
                     double[,] q_std = Helpers.MultiplyMatrices(Q, xVec);
                     double[] q_total = { 2 * q_std[0, 0], 2 * q_std[1, 0], 2 * q_std[2, 0], 2 * q_std[3, 0] };
 
-                    // Sum up derivatives for every obstacle
-                    foreach (var obs in obstacles)
+                    // Add Obstacle Derivatives
+                    if (obstacles != null)
                     {
-                        var (obsCost, obs_q, obs_Q) = GetSingleObstacleDerivatives(x_trajectory[t], obs);
+                        foreach (var obs in obstacles)
+                        {
+                            var (obsCost, obs_q, obs_Q) = GetSingleObstacleDerivatives(x_trajectory[t], obs);
+                            Q_total = Helpers.AddMatrices(Q_total, obs_Q);
+                            for (int i = 0; i < 4; i++) q_total[i] += obs_q[i];
+                        }
+                    }
 
-                        Q_total = Helpers.AddMatrices(Q_total, obs_Q); // Add curvature
-                        for (int i = 0; i < 4; i++) q_total[i] += obs_q[i]; // Add gradient push
+                    // Add Track Boundary Derivatives (Racing Only)
+                    if (trackWidth > 0 && referencePath != null)
+                    {
+                        // Note: For now, we rely on the Q matrix to keep the car on the path.
+                        // Strict boundary walls would be added here as a "Barrier Function".
                     }
 
                     Q_list.Add(Q_total);
                     q_list.Add(q_total);
 
+                    // Input Cost Derivatives (R, r)
                     if (t < horizon)
                     {
                         R_list.Add(R);
@@ -85,10 +114,10 @@
                     }
                 }
 
-                // --- C. SOLVE LQR ---
+                // --- C. SOLVE LQR (Backward Pass) ---
                 var gains = DynamicLQR.BackwardPass(A_list, B_list, Q_list, R_list, q_list, r_list, horizon);
 
-                // --- D. UPDATE CONTROLS ---
+                // --- D. UPDATE CONTROLS (Forward Pass with Line Search) ---
                 double bestCost = totalCost;
                 bool improved = false;
                 List<double[]> best_u_trajectory = u_trajectory;
@@ -122,7 +151,7 @@
                         candidate_x_traj.Add(xSim);
                     }
 
-                    double candidateCost = CalculateTrajectoryCost(candidate_x_traj, candidate_u_traj, Q, R, obstacles);
+                    double candidateCost = CalculateCost(candidate_x_traj, candidate_u_traj, Q, R, obstacles, referencePath, trackWidth);
 
                     if (candidateCost < bestCost)
                     {
@@ -141,21 +170,35 @@
 
         // === HELPERS ===
 
-        private static double CalculateTrajectoryCost(List<double[]> X, List<double[]> U, double[,] Q, double[,] R, List<Obstacle> obstacles)
+        private static double CalculateCost(List<double[]> X, List<double[]> U, double[,] Q, double[,] R, List<Obstacle>? obstacles, List<double[]>? path, double trackWidth)
         {
             double cost = 0;
             for (int t = 0; t < X.Count; t++)
             {
-                double targetVel = (Math.Sqrt(X[t][0] * X[t][0] + X[t][1] * X[t][1]) < 5.0) ? 0 : 10.0;
-                double[] xError = { X[t][0], X[t][1], X[t][2] - targetVel, X[t][3] };
-
-                double[,] errVec = Helpers.ToColumnVector(xError);
-                cost += Helpers.VectorQuadForm(errVec, Q);
-
-                // Sum costs of all obstacles
-                foreach (var obs in obstacles)
+                double[] xTarget;
+                if (path != null && path.Count > 0)
                 {
-                    cost += GetSingleObstacleCost(X[t], obs);
+                    int idx = GetClosestPathIndex(X[t], path);
+                    xTarget = path[idx];
+                }
+                else
+                {
+                    double dist = Math.Sqrt(X[t][0] * X[t][0] + X[t][1] * X[t][1]);
+                    xTarget = new double[] { 0, 0, (dist < 5 ? 0 : 10), 0 };
+                }
+
+                double[] err = { X[t][0] - xTarget[0], X[t][1] - xTarget[1], X[t][2] - xTarget[2], X[t][3] - xTarget[3] };
+                while (err[3] > Math.PI) err[3] -= 2 * Math.PI;
+                while (err[3] < -Math.PI) err[3] += 2 * Math.PI;
+
+                cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(err), Q);
+
+                if (obstacles != null)
+                {
+                    foreach (var obs in obstacles)
+                    {
+                        cost += GetSingleObstacleCost(X[t], obs);
+                    }
                 }
             }
             for (int t = 0; t < U.Count; t++)
@@ -166,11 +209,21 @@
             return cost;
         }
 
+        private static int GetClosestPathIndex(double[] x, List<double[]> path)
+        {
+            double min = double.MaxValue;
+            int idx = 0;
+            for (int i = 0; i < path.Count; i++)
+            {
+                double d = Math.Pow(x[0] - path[i][0], 2) + Math.Pow(x[1] - path[i][1], 2);
+                if (d < min) { min = d; idx = i; }
+            }
+            return idx;
+        }
+
         private static double GetSingleObstacleCost(double[] x, Obstacle obs)
         {
-            double px = x[0];
-            double py = x[1];
-            double distSq = Math.Pow(px - obs.X, 2) + Math.Pow(py - obs.Y, 2);
+            double distSq = Math.Pow(x[0] - obs.X, 2) + Math.Pow(x[1] - obs.Y, 2);
             return obs.Weight * Math.Exp(-distSq / (obs.Radius * obs.Radius));
         }
 
@@ -184,27 +237,22 @@
             double distSq = dx * dx + dy * dy;
             double rSq = obs.Radius * obs.Radius;
 
-            // 1. Cost Value
             double exponent = -distSq / rSq;
             double cost = obs.Weight * Math.Exp(exponent);
 
-            // 2. Gradient (q) 
             double factor = cost * (-2.0 / rSq);
             double[] q = new double[4];
             q[0] = factor * dx;
             q[1] = factor * dy;
-            q[2] = 0;
-            q[3] = 0;
 
-            // 3. Hessian (Q)
-            double[,] Q = new double[4, 4];
+            double[,] Q_mat = new double[4, 4];
             double hessianFactor = -factor;
             if (hessianFactor < 0) hessianFactor = 0;
 
-            Q[0, 0] = hessianFactor;
-            Q[1, 1] = hessianFactor;
+            Q_mat[0, 0] = hessianFactor;
+            Q_mat[1, 1] = hessianFactor;
 
-            return (cost, q, Q);
+            return (cost, q, Q_mat);
         }
     }
 }

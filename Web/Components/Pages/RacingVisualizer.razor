@@ -1,0 +1,155 @@
+﻿@page "/racing"
+@inject SimulationService Sim
+@inject IJSRuntime JS
+@using System.Timers
+@using Web.Data
+@using Web.Services
+@using Web.Services.Scenarios
+@implements IDisposable
+
+<div class="container-fluid h-100 d-flex flex-column">
+    <div class="row bg-dark text-white p-3 shadow-sm">
+        <div class="col-md-6 d-flex align-items-center">
+            <h3 class="m-0 me-3">🏎️ Path Tracking MPC</h3>
+            <span class="badge bg-secondary">Racing Mode</span>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-outline-light btn-sm" @onclick="ResetTrack">Clear Track</button>
+            <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
+                @(_isRunning ? "Stop Simulation" : "Start Race")
+            </button>
+        </div>
+    </div>
+
+    <div class="row flex-grow-1">
+        <div class="col-md-12 bg-light p-0 position-relative d-flex justify-content-center align-items-center">
+
+            <div class="position-absolute top-0 start-50 translate-middle-x mt-3 bg-white p-2 rounded shadow opacity-75" style="pointer-events: none;">
+                @if (_trackExists)
+                {
+                    <span class="text-success fw-bold">Track Ready. Click Start!</span>
+                }
+                else
+                {
+                    <span class="text-primary fw-bold">Click and Drag to draw a loop!</span>
+                }
+            </div>
+
+            <canvas id="raceCanvas" width="1000" height="700" style="background: #ffffff; cursor: pointer; box-shadow: 0 0 20px rgba(0,0,0,0.1);"></canvas>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Timer? _timer;
+    private DotNetObjectReference<RacingVisualizer>? _objRef;
+    private bool _isRunning = false;
+    private bool _trackExists = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Switch logic to Racing Scenario
+        Sim.SetScenario(new RacingScenario());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initCanvasEvents", "raceCanvas", _objRef);
+            await DrawFrame();
+        }
+    }
+
+    // === INTERACTION HANDLERS ===
+
+    [JSInvokable]
+    public async Task HandleMouseDown(double x, double y)
+    {
+        if (_isRunning) return;
+
+        Sim.HandleInteraction(x, y, "StartDraw");
+        await DrawFrame();
+    }
+
+    [JSInvokable]
+    public async Task HandleMouseMove(double x, double y)
+    {
+        if (_isRunning) return;
+
+        Sim.HandleInteraction(x, y, "Drawing");
+        await DrawFrame();
+    }
+
+    [JSInvokable]
+    public async Task HandleMouseUp()
+    {
+        if (_isRunning) return;
+
+        Sim.HandleInteraction(0, 0, "EndDraw");
+
+        // Check if track was successfully created
+        var data = Sim.GetCurrentVisuals() as List<double[]>;
+        _trackExists = (data != null && data.Count > 0);
+
+        await DrawFrame();
+    }
+
+    // === SIMULATION LOOP ===
+
+    private void ToggleSim()
+    {
+        if (_isRunning) Stop(); else Start();
+    }
+
+    private void Start()
+    {
+        if (!_trackExists) return;
+        if (_timer != null) return;
+
+        _timer = new Timer(Sim.Dt * 1000);
+        _timer.Elapsed += async (s, e) => await Tick();
+        _timer.Start();
+        _isRunning = true;
+    }
+
+    private void Stop()
+    {
+        _timer?.Stop();
+        _timer = null;
+        _isRunning = false;
+    }
+
+    private async Task Tick()
+    {
+        // Advances physics by one step
+        Sim.RunStep();
+        await DrawFrame();
+    }
+
+    private async Task DrawFrame()
+    {
+        // Get the current state (DTO) without advancing physics
+        var carDto = Sim.GetCurrentState();
+        var visuals = Sim.GetCurrentVisuals();
+
+        // Call the specific racing draw function from racing.js
+        await JS.InvokeVoidAsync("drawRacing", "raceCanvas", carDto, visuals);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ResetTrack()
+    {
+        Stop();
+        Sim.Reset();
+        _trackExists = false;
+        _ = DrawFrame();
+    }
+
+    public void Dispose()
+    {
+        Stop();
+        _objRef?.Dispose();
+    }
+}

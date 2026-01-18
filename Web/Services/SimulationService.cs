@@ -1,51 +1,54 @@
 ﻿using Core;
 using Web.Data;
+using Web.Services.Scenarios;
 
 namespace Web.Services
 {
     public class SimulationService
     {
-        // The "Real" state of the car in the world: [X, Y, Velocity, Angle]
+        // Holds the current logic (Parking vs Racing)
+        public ISimulationScenario ActiveScenario { get; private set; }
+
+        // The global "Physical" state of the car: [x, y, v, theta]
         private double[] _realCarState = new double[4];
 
-        // The Obstacles in the world
-        private List<Obstacle> _obstacles = new();
-
-        private double[,] _Q = {
-            { 10, 0, 0, 0 },
-            { 0, 10, 0, 0 },
-            { 0, 0, 100, 0 },
-            { 0, 0, 0, 10 }
-        };
-        private double[,] _R = {
-            { 1, 0 },
-            { 0, 1 }
-        };
-
-        // Your default starting configuration
-        public double[] StartPoint { get; set; } = { 0.0, 0.0, 0.0, 0.0 };
-        public double[] TargetPoint { get; set; } = { 0.0, 0.0 };
-
-        // These properties now act as "Live" sliders for the next time you move the car
-        public double InitialVelocity { get; set; } = 10.0;
-        public double InitialAngle { get; set; } = 0.5;
-
-        public int Horizon { get; set; } = 40;
+        // Global Simulation Settings
         public double Dt { get; set; } = 0.1;
-        public double ObstacleRadius { get; set; } = 4.0;
-        public double ObstacleWeight { get; set; } = 10000.0;
+        public double InitialVelocity { get; set; } = 0.0;
+        public double InitialAngle { get; set; } = 0.0;
 
-        public void Reset()
+        public SimulationService()
         {
-            // Reset to the default StartPoint array
-            _realCarState = new double[] { StartPoint[0], StartPoint[1], StartPoint[2], StartPoint[3] };
+            // Default to parking to avoid null errors on startup
+            LoadScenario("parking");
+        }
+
+        // === THIS WAS MISSING ===
+        // Allows Razor pages to switch scenarios type-safely
+        public void SetScenario(ISimulationScenario scenario)
+        {
+            ActiveScenario = scenario;
+            _realCarState = new double[] { 0, 0, 0, 0 }; // Reset car position on switch
+            ActiveScenario.Reset();
+        }
+
+        // String-based loader for default constructor
+        public void LoadScenario(string name)
+        {
+            if (name == "parking") SetScenario(new ParkingScenario());
+            else if (name == "racing") SetScenario(new RacingScenario());
         }
 
         public CarStateDTO RunStep()
         {
-            double[] u = ILQR_Controller.Solve(_realCarState, _Q, _R, _obstacles, Horizon, maxIterations: 5, Dt);
+            // 1. Ask the active scenario to calculate the next move
+            var result = ActiveScenario.RunStep(Dt, _realCarState);
+
+            // 2. Apply Physics (Global)
+            double[] u = { result.Accel, result.Steer };
             _realCarState = PhysicsEngine.Step(_realCarState, u, Dt);
 
+            // 3. Return full state to UI
             return new CarStateDTO
             {
                 X = _realCarState[0],
@@ -57,22 +60,18 @@ namespace Web.Services
             };
         }
 
-        public List<Obstacle> GetObstacles() => _obstacles;
+        // Bridge UI interaction to active scenario
+        public void HandleInteraction(double x, double y, string mode) => ActiveScenario.HandleInteraction(x, y, mode);
 
-        public void AddObstacle(double x, double y)
+        public object GetCurrentVisuals() => ActiveScenario.GetVisualizationData();
+
+        public void Reset()
         {
-            _obstacles.Add(new Obstacle { X = x, Y = y, Radius = ObstacleRadius, Weight = ObstacleWeight });
+            _realCarState = new double[] { 0, 0, 0, 0 };
+            ActiveScenario.Reset();
         }
 
-        public void UpdateObstaclePosition(int index, double x, double y)
-        {
-            if (index >= 0 && index < _obstacles.Count)
-            {
-                _obstacles[index].X = x;
-                _obstacles[index].Y = y;
-            }
-        }
-
+        // Helper to get raw state without advancing physics (Critical for DrawFrame)
         public CarStateDTO GetCurrentState()
         {
             return new CarStateDTO
@@ -84,28 +83,16 @@ namespace Web.Services
             };
         }
 
+        // Helper to manually move car (used in Parking UI)
         public void SetCarPosition(double x, double y)
         {
-            // This is where we sync the sliders and the click
-            // X and Y come from the mouse click
             _realCarState[0] = x;
             _realCarState[1] = y;
-            // Velocity and Angle come from your sidebar sliders
             _realCarState[2] = InitialVelocity;
             _realCarState[3] = InitialAngle;
         }
 
-        public void ClearAllObstacles()
-        {
-            _obstacles.Clear();
-        }
-
-        public void RemoveObstacle(int index)
-        {
-            if (index >= 0 && index < _obstacles.Count)
-            {
-                _obstacles.RemoveAt(index);
-            }
-        }
+        // Expose raw state if needed for debugging or advanced scenarios
+        public double[] GetRealCarState() => _realCarState;
     }
 }
