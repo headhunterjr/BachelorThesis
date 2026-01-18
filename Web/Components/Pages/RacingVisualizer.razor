@@ -90,8 +90,8 @@
         Sim.HandleInteraction(0, 0, "EndDraw");
 
         // Check if track was successfully created
-        var data = Sim.GetCurrentVisuals() as List<double[]>;
-        _trackExists = (data != null && data.Count > 0);
+        var data = Sim.GetCurrentVisuals() as RacingVisuals;
+        _trackExists = (data != null && data.Track != null && data.Track.Count > 0);
 
         await DrawFrame();
     }

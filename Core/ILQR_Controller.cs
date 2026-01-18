@@ -7,6 +7,27 @@
         {
             int nInput = 2;
 
+            // === TUNING OVERRIDE FOR RACING ===
+            // If we are racing (referencePath exists), we ignore the passed Q/R and force
+            // "High Accuracy" weights to keep the car glued to the center line.
+            if (referencePath != null && referencePath.Count > 0)
+            {
+                Q = new double[,] {
+                    { 20, 0, 0, 0 },
+                    { 0, 20, 0, 0 },
+                    { 0, 0, 10, 0 },
+                    { 0, 0, 0, 200 }
+                };
+
+                // R Matrix: [Accel, Steer]
+                // Increased Steering penalty (2000) to force smooth, non-jerky turns.
+                R = new double[,] {
+                    { 1, 0 },
+                    { 0, 1000 }
+                };
+            }
+            // ==================================
+
             // 1. INITIALIZATION
             List<double[]> u_trajectory = new List<double[]>();
             for (int t = 0; t < horizon; t++) u_trajectory.Add(new double[nInput]);
@@ -27,7 +48,6 @@
 
                 double totalCost = CalculateCost(x_trajectory, u_trajectory, Q, R, obstacles, referencePath, trackWidth);
 
-                // Early exit if cost is basically zero
                 if (totalCost < 0.1) break;
 
                 // --- B. LINEARIZE & QUADRATICIZE ---
@@ -53,19 +73,21 @@
 
                     if (referencePath != null && referencePath.Count > 0)
                     {
-                        // === RACING MODE (Path Tracking) ===
+                        // === RACING MODE ===
                         int currentIdx = GetClosestPathIndex(x_trajectory[t], referencePath);
-                        // Look ahead logic: Increase the multiplier (e.g., 2.0) to make the car look further ahead
-                        int lookAhead = (int)(t * 2.0);
+
+                        // REDUCED Lookahead:
+                        // Looking too far ahead (e.g. 2.0 * t) makes the car "cut" the corner.
+                        // Keeping it close (1.0 * t) forces it to stick to the track shape.
+                        int lookAhead = (int)(t * 1.0);
+
                         int targetIdx = (currentIdx + lookAhead) % referencePath.Count;
                         xTarget = referencePath[targetIdx];
                     }
                     else
                     {
-                        // === PARKING MODE (Point Stabilization) ===
-                        // Default target is (0,0)
+                        // === PARKING MODE ===
                         double distToGoal = Math.Sqrt(Math.Pow(x_trajectory[t][0], 2) + Math.Pow(x_trajectory[t][1], 2));
-                        // Braking logic: if closer than 5m, target velocity is 0
                         double targetVel = (distToGoal < 5.0) ? 0.0 : 10.0;
                         xTarget = new double[] { 0, 0, targetVel, 0 };
                     }
@@ -73,7 +95,7 @@
                     // Calculate Error State
                     for (int i = 0; i < 4; i++) xError[i] = x_trajectory[t][i] - xTarget[i];
 
-                    // Normalize Angle Error (Critical for loops!)
+                    // Normalize Angle Error
                     while (xError[3] > Math.PI) xError[3] -= 2 * Math.PI;
                     while (xError[3] < -Math.PI) xError[3] += 2 * Math.PI;
 
@@ -94,13 +116,6 @@
                         }
                     }
 
-                    // Add Track Boundary Derivatives (Racing Only)
-                    if (trackWidth > 0 && referencePath != null)
-                    {
-                        // Note: For now, we rely on the Q matrix to keep the car on the path.
-                        // Strict boundary walls would be added here as a "Barrier Function".
-                    }
-
                     Q_list.Add(Q_total);
                     q_list.Add(q_total);
 
@@ -114,10 +129,10 @@
                     }
                 }
 
-                // --- C. SOLVE LQR (Backward Pass) ---
+                // --- C. SOLVE LQR ---
                 var gains = DynamicLQR.BackwardPass(A_list, B_list, Q_list, R_list, q_list, r_list, horizon);
 
-                // --- D. UPDATE CONTROLS (Forward Pass with Line Search) ---
+                // --- D. UPDATE CONTROLS ---
                 double bestCost = totalCost;
                 bool improved = false;
                 List<double[]> best_u_trajectory = u_trajectory;
