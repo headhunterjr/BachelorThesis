@@ -10,7 +10,9 @@ namespace Web.Services
         public ISimulationScenario ActiveScenario { get; private set; }
 
         // The global "Physical" state of the car: [x, y, v, theta]
-        private double[] _realCarState = new double[4];
+        private double[] _realState = new double[4];
+
+        private Func<double[], double[], double, double[]> _physicsStep;
 
         // Global Simulation Settings
         public double Dt { get; set; } = 0.1;
@@ -20,6 +22,7 @@ namespace Web.Services
         public SimulationService()
         {
             // Default to parking to avoid null errors on startup
+            _physicsStep = PhysicsEngine.Step;
             LoadScenario("parking");
         }
 
@@ -28,7 +31,8 @@ namespace Web.Services
         public void SetScenario(ISimulationScenario scenario)
         {
             ActiveScenario = scenario;
-            _realCarState = new double[] { 0, 0, 0, 0 }; // Reset car position on switch
+            _realState = new double[] { 0, 0, 0, 0 }; // Reset car position on switch
+            _physicsStep = scenario.GetPhysicsModel();
             ActiveScenario.Reset();
         }
 
@@ -42,19 +46,19 @@ namespace Web.Services
         public CarStateDTO RunStep()
         {
             // 1. Ask the active scenario to calculate the next move
-            var result = ActiveScenario.RunStep(Dt, _realCarState);
+            var result = ActiveScenario.RunStep(Dt, _realState);
 
             // 2. Apply Physics (Global)
             double[] u = { result.Accel, result.Steer };
-            _realCarState = PhysicsEngine.Step(_realCarState, u, Dt);
+            _realState = _physicsStep(_realState, u, Dt);
 
             // 3. Return full state to UI
             return new CarStateDTO
             {
-                X = _realCarState[0],
-                Y = _realCarState[1],
-                Velocity = _realCarState[2],
-                Theta = _realCarState[3],
+                X = _realState[0],
+                Y = _realState[1],
+                Velocity = _realState[2],
+                Theta = _realState[3],
                 Accel = u[0],
                 Steer = u[1]
             };
@@ -67,7 +71,7 @@ namespace Web.Services
 
         public void Reset()
         {
-            _realCarState = new double[] { 0, 0, 0, 0 };
+            _realState = new double[] { 0, 0, 0, 0 };
             ActiveScenario.Reset();
         }
 
@@ -76,23 +80,23 @@ namespace Web.Services
         {
             return new CarStateDTO
             {
-                X = _realCarState[0],
-                Y = _realCarState[1],
-                Velocity = _realCarState[2],
-                Theta = _realCarState[3]
+                X = _realState[0],
+                Y = _realState[1],
+                Velocity = _realState[2],
+                Theta = _realState[3]
             };
         }
 
         // Helper to manually move car (used in Parking UI)
         public void SetCarPosition(double x, double y)
         {
-            _realCarState[0] = x;
-            _realCarState[1] = y;
-            _realCarState[2] = InitialVelocity;
-            _realCarState[3] = InitialAngle;
+            _realState[0] = x;
+            _realState[1] = y;
+            _realState[2] = InitialVelocity;
+            _realState[3] = InitialAngle;
         }
 
         // Expose raw state if needed for debugging or advanced scenarios
-        public double[] GetRealCarState() => _realCarState;
+        public double[] GetRealCarState() => _realState;
     }
 }

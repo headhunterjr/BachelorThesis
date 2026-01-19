@@ -74,5 +74,10 @@ namespace Web.Services.Scenarios
         }
 
         public object GetVisualizationData() => _obstacles;
+
+        public Func<double[], double[], double, double[]> GetPhysicsModel()
+        {
+            return PhysicsEngine.Step;
+        }
     }
 }

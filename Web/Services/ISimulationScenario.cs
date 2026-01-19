@@ -16,5 +16,6 @@ namespace Web.Services
 
         // Returns whatever data needs to be drawn (List<Obstacle> or List<double[]>)
         object GetVisualizationData();
+        Func<double[], double[], double, double[]> GetPhysicsModel();
     }
 }

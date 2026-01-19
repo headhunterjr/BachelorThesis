@@ -113,5 +113,10 @@ namespace Web.Services.Scenarios
                 Trail = _carTrail
             };
         }
+
+        public Func<double[], double[], double, double[]> GetPhysicsModel()
+        {
+            return PhysicsEngine.Step;
+        }
     }
 }
