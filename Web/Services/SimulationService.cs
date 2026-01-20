@@ -31,8 +31,9 @@ namespace Web.Services
         public void SetScenario(ISimulationScenario scenario)
         {
             ActiveScenario = scenario;
-            _realState = new double[] { 0, 0, 0, 0 }; // Reset car position on switch
-            _physicsStep = scenario.GetPhysicsModel();
+            _realState = new double[] { 0, 0, 0, 0 };
+            var pm = scenario.GetPhysicsModel();
+            _physicsStep = pm.Step; // keep legacy step for SimulationService's physics application
             ActiveScenario.Reset();
         }
 

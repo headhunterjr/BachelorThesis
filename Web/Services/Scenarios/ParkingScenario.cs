@@ -31,9 +31,9 @@ namespace Web.Services.Scenarios
 
         public CarStateDTO RunStep(double dt, double[] carState)
         {
-            // Use the public Horizon property here
-            var u = ILQR_Controller.Solve(carState, _Q, _R, _obstacles, Horizon, 5, dt, null, 0);
-            return new CarStateDTO { Accel = u[0], Steer = u[1] };
+            var physics = GetPhysicsModel();
+            var u = ILQR_Controller.Solve(carState, _Q, _R, _obstacles, Horizon, 5, dt, physics, null, 0);
+            return new CarStateDTO { Accel = u.ElementAtOrDefault(0), Steer = u.ElementAtOrDefault(1) };
         }
 
         public void HandleInteraction(double x, double y, string mode)
@@ -75,9 +75,10 @@ namespace Web.Services.Scenarios
 
         public object GetVisualizationData() => _obstacles;
 
-        public Func<double[], double[], double, double[]> GetPhysicsModel()
+        public PhysicsModel GetPhysicsModel()
         {
-            return PhysicsEngine.Step;
+            // The default bicycle model: nx=4, nu=2
+            return new PhysicsModel(PhysicsEngine.Step, PhysicsEngine.Linearize, 4, 2);
         }
     }
 }

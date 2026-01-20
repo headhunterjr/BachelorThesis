@@ -1,44 +1,36 @@
-﻿window.gameCanvas = {};
+﻿window.gameCanvas = {
+    scale: 5.0
+};
 
 window.initCanvasEvents = (canvasId, dotNetHelper) => {
     const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const rect = () => canvas.getBoundingClientRect();
+    const scale = window.gameCanvas.scale;
 
-    // Config: 5 pixels = 1 meter
-    window.gameCanvas.scale = 5.0;
-
-    const getCoords = (e) => {
-        const rect = canvas.getBoundingClientRect();
+    const toMeters = (clientX, clientY) => {
+        const r = rect();
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const rawX = e.clientX - rect.left;
-        const rawY = e.clientY - rect.top;
-
-        // Convert to meters
-        const x = (rawX - centerX) / window.gameCanvas.scale;
-        const y = -(rawY - centerY) / window.gameCanvas.scale;
+        const rawX = clientX - r.left;
+        const rawY = clientY - r.top;
+        const x = (rawX - centerX) / scale;
+        const y = -(rawY - centerY) / scale;
         return { x, y };
     };
 
     canvas.onmousedown = (e) => {
-        const c = getCoords(e);
-        // Left Click vs Right Click
-        if (e.button === 2) {
-            dotNetHelper.invokeMethodAsync('HandleRightClick', c.x, c.y);
-        } else {
-            dotNetHelper.invokeMethodAsync('HandleMouseDown', c.x, c.y);
-        }
+        const c = toMeters(e.clientX, e.clientY);
+        if (e.button === 2) dotNetHelper.invokeMethodAsync('HandleRightClick', c.x, c.y);
+        else dotNetHelper.invokeMethodAsync('HandleMouseDown', c.x, c.y);
     };
 
     canvas.onmousemove = (e) => {
-        const c = getCoords(e);
+        const c = toMeters(e.clientX, e.clientY);
         dotNetHelper.invokeMethodAsync('HandleMouseMove', c.x, c.y);
     };
 
-    canvas.onmouseup = (e) => {
-        dotNetHelper.invokeMethodAsync('HandleMouseUp');
-    };
-
-    // Prevent context menu on right click
+    canvas.onmouseup = () => dotNetHelper.invokeMethodAsync('HandleMouseUp');
     canvas.oncontextmenu = (e) => e.preventDefault();
 };
 
