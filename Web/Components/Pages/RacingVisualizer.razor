@@ -123,7 +123,7 @@
 
     private async Task Tick()
     {
-        // Advances physics by one step
+        // Advances physics by one step (Sim.RunStep returns BaseStateDTO and updates global state)
         Sim.RunStep();
         await DrawFrame();
     }
@@ -131,7 +131,8 @@
     private async Task DrawFrame()
     {
         // Get the current state (DTO) without advancing physics
-        var carDto = Sim.GetCurrentState();
+        var baseDto = Sim.GetCurrentState();
+        var carDto = MapBaseToCar(baseDto);
         var visuals = Sim.GetCurrentVisuals();
 
         // Call the specific racing draw function from racing.js
@@ -145,6 +146,25 @@
         Sim.Reset();
         _trackExists = false;
         _ = DrawFrame();
+    }
+
+    // Map BaseStateDTO -> CarStateDTO for drawing
+    private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
+    {
+        var car = new CarStateDTO();
+        car.State = new double[4];
+        car.Control = new double[2];
+        if (baseDto?.State != null)
+        {
+            for (int i = 0; i < Math.Min(baseDto.State.Length, 4); i++)
+                car.State[i] = baseDto.State[i];
+        }
+        if (baseDto?.Control != null)
+        {
+            for (int i = 0; i < Math.Min(baseDto.Control.Length, 2); i++)
+                car.Control[i] = baseDto.Control[i];
+        }
+        return car;
     }
 
     public void Dispose()

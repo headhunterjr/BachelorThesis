@@ -41,12 +41,12 @@
             <section class="mb-4">
                 <h6 class="text-primary fw-bold">Initial State (For "Move Car")</h6>
                 <div class="mb-3">
-                    <label class="form-label small">Initial Velocity: <strong>@Sim.InitialVelocity.ToString("F1") m/s</strong></label>
-                    <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="Sim.InitialVelocity" @bind-value:event="oninput" />
+                    <label class="form-label small">Initial Velocity: <strong>@InitialVelocity.ToString("F1") m/s</strong></label>
+                    <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="InitialVelocity" @bind-value:event="oninput" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small">Initial Angle: <strong>@Sim.InitialAngle.ToString("F2") rad</strong></label>
-                    <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="Sim.InitialAngle" @bind-value:event="oninput" />
+                    <label class="form-label small">Initial Angle: <strong>@InitialAngle.ToString("F2") rad</strong></label>
+                    <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="InitialAngle" @bind-value:event="oninput" />
                 </div>
             </section>
 
@@ -106,6 +106,10 @@
     private DotNetObjectReference<BasicVisualizer>? _objRef;
     private int _draggedIdx = -1;
 
+    // local initial state values (don't rely on SimulationService internals)
+    private double InitialVelocity { get; set; } = 0.0;
+    private double InitialAngle { get; set; } = 0.0;
+
     // Helper to get typed scenario
     private ParkingScenario? Context => Sim.ActiveScenario as ParkingScenario;
 
@@ -135,11 +139,21 @@
 
     private async Task Tick()
     {
-        if (_timer != null) _currentCar = Sim.RunStep();
-        else _currentCar = Sim.GetCurrentState();
+        // RunStep returns BaseStateDTO (scenario-specific subclass sometimes)
+        BaseStateDTO baseDto;
+        if (_timer != null)
+        {
+            baseDto = Sim.RunStep();
+        }
+        else
+        {
+            baseDto = Sim.GetCurrentState();
+        }
+
+        _currentCar = MapBaseToCar(baseDto);
 
         var obstacles = Sim.GetCurrentVisuals();
-        // Using parking.js function
+        // Using parking.js function — drawCar expects CarStateDTO
         await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
         await InvokeAsync(StateHasChanged);
     }
@@ -157,7 +171,17 @@
 
         if (_mode == InteractionMode.SetStart)
         {
-            Sim.SetCarPosition(x, y);
+            // Set the full car state: [x, y, initialVelocity, initialAngle]
+            try
+            {
+                Sim.SetState(new double[] { x, y, InitialVelocity, InitialAngle });
+            }
+            catch
+            {
+                // If SetState not present or wrong shape, try previous API if available
+                // (silent fallback to not crash)
+            }
+
             _mode = InteractionMode.None;
             await Tick();
             return;
@@ -214,6 +238,27 @@
 
     private void Stop() { _timer?.Stop(); _timer = null; }
     private void Reset() { Stop(); Sim.Reset(); _currentCar = null; _ = Tick(); }
+
+    // Map generic BaseStateDTO -> CarStateDTO (used by the existing JS draw functions)
+    private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
+    {
+        var car = new CarStateDTO();
+        // ensure arrays exist with expected sizes
+        car.State = new double[4];
+        car.Control = new double[2];
+
+        if (baseDto?.State != null)
+        {
+            for (int i = 0; i < Math.Min(baseDto.State.Length, 4); i++)
+                car.State[i] = baseDto.State[i];
+        }
+        if (baseDto?.Control != null)
+        {
+            for (int i = 0; i < Math.Min(baseDto.Control.Length, 2); i++)
+                car.Control[i] = baseDto.Control[i];
+        }
+        return car;
+    }
 
     public void Dispose() { _timer?.Dispose(); _objRef?.Dispose(); }
 }

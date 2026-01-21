@@ -29,11 +29,14 @@ namespace Web.Services.Scenarios
             _obstacles.Clear();
         }
 
-        public CarStateDTO RunStep(double dt, double[] carState)
+        public BaseStateDTO RunStep(double dt, double[] carState)
         {
-            var physics = GetPhysicsModel();
-            var u = ILQR_Controller.Solve(carState, _Q, _R, _obstacles, Horizon, 5, dt, physics, null, 0);
-            return new CarStateDTO { Accel = u.ElementAtOrDefault(0), Steer = u.ElementAtOrDefault(1) };
+            var state = carState != null && carState.Length >= 4 ? carState : new double[4];
+            var u = ILQR_Controller.Solve(carState, _Q, _R, _obstacles, Horizon, 5, dt, GetPhysicsModel(), null, 0);
+            return new CarStateDTO
+            {
+                Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) }
+            };
         }
 
         public void HandleInteraction(double x, double y, string mode)

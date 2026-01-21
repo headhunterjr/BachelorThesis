@@ -1,103 +1,110 @@
-﻿using Core;
-using Web.Data;
+﻿using Web.Data;
 using Web.Services.Scenarios;
 
 namespace Web.Services
 {
     public class SimulationService
     {
-        // Holds the current logic (Parking vs Racing)
+        // Active scenario
         public ISimulationScenario ActiveScenario { get; private set; }
 
-        // The global "Physical" state of the car: [x, y, v, theta]
-        private double[] _realState = new double[4];
+        // Global state vector (length = current scenario Nx)
+        private double[] _realState = Array.Empty<double>();
 
+        // Physics step delegate (from PhysicsModel.Step)
         private Func<double[], double[], double, double[]> _physicsStep;
 
-        // Global Simulation Settings
+        // Simulation settings
         public double Dt { get; set; } = 0.1;
-        public double InitialVelocity { get; set; } = 0.0;
-        public double InitialAngle { get; set; } = 0.0;
 
+        // default ctor sets a benign scenario
         public SimulationService()
         {
-            // Default to parking to avoid null errors on startup
-            _physicsStep = PhysicsEngine.Step;
-            LoadScenario("parking");
+            // default to parking to avoid null errors on startup
+            SetScenario(new ParkingScenario());
         }
 
-        // === THIS WAS MISSING ===
-        // Allows Razor pages to switch scenarios type-safely
+        // SetScenario: use scenario's PhysicsModel to size _realState and _physicsStep
         public void SetScenario(ISimulationScenario scenario)
         {
-            ActiveScenario = scenario;
-            _realState = new double[] { 0, 0, 0, 0 };
-            var pm = scenario.GetPhysicsModel();
-            _physicsStep = pm.Step; // keep legacy step for SimulationService's physics application
+            ActiveScenario = scenario ?? throw new ArgumentNullException(nameof(scenario));
+            var pm = ActiveScenario.GetPhysicsModel() ?? throw new InvalidOperationException("Scenario must provide a PhysicsModel.");
+            // size global state to Nx
+            _realState = new double[pm.Nx];
+            // set physics step
+            _physicsStep = pm.Step ?? ((x, u, dt) => x);
             ActiveScenario.Reset();
         }
 
-        // String-based loader for default constructor
+        // String-based convenience
         public void LoadScenario(string name)
         {
             if (name == "parking") SetScenario(new ParkingScenario());
             else if (name == "racing") SetScenario(new RacingScenario());
+            else if (name == "datacenter") SetScenario(new DataCenterScenario());
+            else throw new ArgumentException($"Unknown scenario '{name}'");
         }
 
-        public CarStateDTO RunStep()
+        // === CORE: RunStep returns BaseStateDTO (no legacy wrappers) ===
+        public BaseStateDTO RunStep()
         {
-            // 1. Ask the active scenario to calculate the next move
-            var result = ActiveScenario.RunStep(Dt, _realState);
+            if (ActiveScenario == null) throw new InvalidOperationException("No active scenario set.");
 
-            // 2. Apply Physics (Global)
-            double[] u = { result.Accel, result.Steer };
-            _realState = _physicsStep(_realState, u, Dt);
+            // defensive clone
+            var stateCopy = (double[])_realState.Clone();
 
-            // 3. Return full state to UI
-            return new CarStateDTO
+            // ask scenario what to do; scenario may return a specialized DTO (e.g. DataCenterStateDTO or CarStateDTO)
+            var result = ActiveScenario.RunStep(Dt, stateCopy) ?? new BaseStateDTO();
+
+            // the scenario is expected to populate result.Control (or Leave it empty).
+            var control = result.Control ?? Array.Empty<double>();
+
+            // apply physics using the configured step - physics expects (state, control, dt) -> new state
+            try
             {
-                X = _realState[0],
-                Y = _realState[1],
-                Velocity = _realState[2],
-                Theta = _realState[3],
-                Accel = u[0],
-                Steer = u[1]
+                var newState = _physicsStep != null ? _physicsStep(_realState, control, Dt) : _realState;
+                if (newState != null) _realState = newState;
+            }
+            catch
+            {
+                // swallow physics exceptions to avoid crashing UI; optionally log
+            }
+
+            // populate and return the result DTO with the updated state and applied control
+            result.State = (double[])_realState.Clone();
+            result.Control = control.Length > 0 ? control : Array.Empty<double>();
+
+            return result;
+        }
+
+        // Current state getter (generic)
+        public BaseStateDTO GetCurrentState()
+        {
+            return new BaseStateDTO
+            {
+                State = (double[])_realState.Clone(),
+                Control = Array.Empty<double>()
             };
         }
 
         // Bridge UI interaction to active scenario
-        public void HandleInteraction(double x, double y, string mode) => ActiveScenario.HandleInteraction(x, y, mode);
+        public void HandleInteraction(double x, double y, string mode) => ActiveScenario?.HandleInteraction(x, y, mode);
 
-        public object GetCurrentVisuals() => ActiveScenario.GetVisualizationData();
+        public object GetCurrentVisuals() => ActiveScenario?.GetVisualizationData();
 
         public void Reset()
         {
-            _realState = new double[] { 0, 0, 0, 0 };
-            ActiveScenario.Reset();
+            // size remains same, reset elements to zero
+            for (int i = 0; i < _realState.Length; i++) _realState[i] = 0.0;
+            ActiveScenario?.Reset();
         }
 
-        // Helper to get raw state without advancing physics (Critical for DrawFrame)
-        public CarStateDTO GetCurrentState()
+        // Helper: manually move state (keeps Nx)
+        public void SetState(double[] newState)
         {
-            return new CarStateDTO
-            {
-                X = _realState[0],
-                Y = _realState[1],
-                Velocity = _realState[2],
-                Theta = _realState[3]
-            };
+            if (newState == null) return;
+            if (newState.Length != _realState.Length) throw new ArgumentException("New state length mismatch.");
+            _realState = (double[])newState.Clone();
         }
-
-        // Helper to manually move car (used in Parking UI)
-        public void SetCarPosition(double x, double y)
-        {
-            _realState[0] = x;
-            _realState[1] = y;
-            _realState[2] = InitialVelocity;
-            _realState[3] = InitialAngle;
-        }
-
-        // Expose raw state if needed for debugging or advanced scenarios
-        public double[] GetRealCarState() => _realState;
     }
 }

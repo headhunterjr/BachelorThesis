@@ -44,13 +44,15 @@ namespace Web.Services.Scenarios
             _isDrawing = false;
         }
 
-        public CarStateDTO RunStep(double dt, double[] carState)
+        public BaseStateDTO RunStep(double dt, double[] carState)
         {
-            if (_processedPath.Count == 0) return new CarStateDTO();
+            if (_processedPath.Count == 0) return new CarStateDTO { Control = new double[] { 0.0, 0.0 } };
             _carTrail.Add(new double[] { carState[0], carState[1] });
-            var physics = GetPhysicsModel();
-            var u = ILQR_Controller.Solve(carState, _Q, _R, new List<Obstacle>(), 30, 5, dt, physics, _processedPath, _trackWidth);
-            return new CarStateDTO { Accel = u.ElementAtOrDefault(0), Steer = u.ElementAtOrDefault(1) };
+            var u = ILQR_Controller.Solve(carState, _Q, _R, new List<Obstacle>(), 30, 5, dt, GetPhysicsModel(), _processedPath, _trackWidth);
+            return new CarStateDTO
+            {
+                Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) }
+            };
         }
 
         public void HandleInteraction(double x, double y, string mode)
