@@ -9,13 +9,11 @@
 
     if (!data) return;
 
-    // Handle case sensitivity (Blazor might serialize as 'track' or 'Track')
     const track = data.track || data.Track;
     const trail = data.trail || data.Trail;
 
     // 1. Draw Reference Track (Gray)
     if (track && track.length > 0) {
-        // Center Line
         ctx.strokeStyle = "#aaaaaa";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -29,7 +27,7 @@
 
         // Boundaries
         ctx.strokeStyle = "rgba(0, 0, 0, 0.05)";
-        ctx.lineWidth = 10 * scale;
+        ctx.lineWidth = 15 * scale;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.beginPath();
@@ -58,7 +56,6 @@
         });
         ctx.stroke();
 
-        // Reset Shadow
         ctx.shadowBlur = 0;
     }
 

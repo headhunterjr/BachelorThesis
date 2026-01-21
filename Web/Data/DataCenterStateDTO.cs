@@ -2,7 +2,6 @@
 {
     public class DataCenterStateDTO : BaseStateDTO
     {
-        // Temperature mapped to State[0]
         public double Temperature
         {
             get => State.Length > 0 ? State[0] : 0.0;
@@ -13,7 +12,6 @@
             }
         }
 
-        // Cooling power control mapped to Control[0]
         public double CoolingPower
         {
             get => Control.Length > 0 ? Control[0] : 0.0;

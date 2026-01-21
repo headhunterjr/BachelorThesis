@@ -1,5 +1,4 @@
-﻿// File: wwwroot/js/data-center.js
-window.DataCenterUI = (function () {
+﻿window.DataCenterUI = (function () {
     const module = {};
     module.heatArr = [];
     module.priceArr = [];

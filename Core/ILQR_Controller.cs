@@ -2,34 +2,23 @@
 {
     public class ILQR_Controller
     {
-        // Solve now receives a PhysicsModel with Step and Linearize
-        public static double[] Solve(
-            double[] xInit,
-            double[,] Q,
-            double[,] R,
-            List<Obstacle> obstacles,
-            int horizon,
-            int maxIterations,
-            double dt,
-            PhysicsModel physicsModel,
-            List<double[]>? referencePath = null,
-            double trackWidth = 0)
+        public static double[] Solve(double[] xInit, double[,] Q, double[,] R, List<Obstacle> obstacles, int horizon, int maxIterations, double dt, PhysicsModel physicsModel, List<double[]>? referencePath = null, double trackWidth = 0)
         {
             int nx = xInit.Length;
             int nu = physicsModel.Nu;
 
             // Initialize control trajectory with zeros
             List<double[]> u_trajectory = new List<double[]>();
-            for (int t = 0; t < horizon; t++) u_trajectory.Add(new double[nu]);
+            for (int t = 0; t < horizon; ++t) u_trajectory.Add(new double[nu]);
 
-            for (int iter = 0; iter < maxIterations; iter++)
+            for (int iter = 0; iter < maxIterations; ++iter)
             {
                 // A. Rollout
                 List<double[]> x_trajectory = new List<double[]>();
                 double[] xCurrent = (double[])xInit.Clone();
                 x_trajectory.Add(xCurrent);
 
-                for (int t = 0; t < horizon; t++)
+                for (int t = 0; t < horizon; ++t)
                 {
                     xCurrent = physicsModel.Step(xCurrent, u_trajectory[t], dt);
                     x_trajectory.Add(xCurrent);
@@ -46,7 +35,7 @@
                 var q_list = new List<double[]>();
                 var r_list = new List<double[]>();
 
-                for (int t = 0; t <= horizon; t++)
+                for (int t = 0; t <= horizon; ++t)
                 {
                     if (t < horizon)
                     {
@@ -72,7 +61,7 @@
                         double distToGoal = Math.Sqrt(Math.Pow(x_trajectory[t][0], 2) + Math.Pow(x_trajectory[t][1], 2));
                         double targetVel = (distToGoal < 5.0 && nx > 2) ? 0.0 : (nx > 2 ? 10.0 : 0.0);
                         // Build xTarget with zeros and targetVel if available
-                        for (int i = 0; i < nx; i++) xTarget[i] = 0.0;
+                        for (int i = 0; i < nx; ++i) xTarget[i] = 0.0;
                         if (nx > 2) xTarget[2] = targetVel;
                     }
 
@@ -90,7 +79,7 @@
                     var xVec = Helpers.ToColumnVector(xError);
                     var q_std = Helpers.MultiplyMatrices(Q, xVec);
                     double[] q_total = new double[nx];
-                    for (int i = 0; i < nx; i++) q_total[i] = 2 * q_std[i, 0];
+                    for (int i = 0; i < nx; ++i) q_total[i] = 2 * q_std[i, 0];
 
                     if (obstacles != null)
                     {
@@ -98,7 +87,7 @@
                         {
                             var (obsCost, obs_q, obs_Q) = GetSingleObstacleDerivatives(x_trajectory[t], obs, nx);
                             Q_total = Helpers.AddMatrices(Q_total, obs_Q);
-                            for (int i = 0; i < nx; i++) q_total[i] += obs_q[i];
+                            for (int i = 0; i < nx; ++i) q_total[i] += obs_q[i];
                         }
                     }
 
@@ -111,7 +100,7 @@
                         var uVec = Helpers.ToColumnVector(u_trajectory[t]);
                         var r_val = Helpers.MultiplyMatrices(R, uVec);
                         double[] r_arr = new double[nu];
-                        for (int i = 0; i < nu; i++) r_arr[i] = 2 * r_val[i, 0];
+                        for (int i = 0; i < nu; ++i) r_arr[i] = 2 * r_val[i, 0];
                         r_list.Add(r_arr);
                     }
                 }
@@ -131,18 +120,18 @@
                     double[] xSim = (double[])xInit.Clone();
                     candidate_x.Add(xSim);
 
-                    for (int t = 0; t < horizon; t++)
+                    for (int t = 0; t < horizon; ++t)
                     {
                         double[] k = gains[t].k;
                         double[,] K = gains[t].K;
 
                         double[] dx = new double[nx];
-                        for (int j = 0; j < nx; j++) dx[j] = xSim[j] - x_trajectory[t][j];
+                        for (int j = 0; j < nx; ++j) dx[j] = xSim[j] - x_trajectory[t][j];
 
                         var Kdx = Helpers.MultiplyMatrices(K, Helpers.ToColumnVector(dx));
 
                         double[] u_update = new double[nu];
-                        for (int i = 0; i < nu; i++)
+                        for (int i = 0; i < nu; ++i)
                         {
                             u_update[i] = u_trajectory[t][i] + alpha * k[i] + Kdx[i, 0];
                         }
@@ -176,7 +165,7 @@
             int nx = Q.GetLength(0);
             int nu = R.GetLength(0);
 
-            for (int t = 0; t < X.Count; t++)
+            for (int t = 0; t < X.Count; ++t)
             {
                 double[] xTarget = new double[nx];
                 if (path != null && path.Count > 0)
@@ -193,7 +182,7 @@
                 }
 
                 double[] err = new double[nx];
-                for (int i = 0; i < nx; i++) err[i] = X[t][i] - xTarget[i];
+                for (int i = 0; i < nx; ++i) err[i] = X[t][i] - xTarget[i];
                 if (nx > 3)
                 {
                     while (err[3] > Math.PI) err[3] -= 2 * Math.PI;
@@ -209,7 +198,7 @@
                 }
             }
 
-            for (int t = 0; t < U.Count; t++)
+            for (int t = 0; t < U.Count; ++t)
             {
                 var uVec = Helpers.ToColumnVector(U[t]);
                 cost += Helpers.VectorQuadForm(uVec, R);
@@ -221,7 +210,7 @@
         private static int GetClosestPathIndex(double[] x, List<double[]> path)
         {
             double min = double.MaxValue; int idx = 0;
-            for (int i = 0; i < path.Count; i++)
+            for (int i = 0; i < path.Count; ++i)
             {
                 double d = Math.Pow(x[0] - path[i][0], 2) + Math.Pow(x[1] - path[i][1], 2);
                 if (d < min) { min = d; idx = i; }

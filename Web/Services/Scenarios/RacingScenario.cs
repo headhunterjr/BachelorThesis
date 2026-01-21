@@ -22,7 +22,6 @@ namespace Web.Services.Scenarios
         private bool _isDrawing = false;
         private double _trackWidth = 10.0;
 
-        // Tuned Weights (High Accuracy)
         private double[,] _Q = 
             { 
                 { 20, 0, 0, 0 }, 
@@ -40,7 +39,7 @@ namespace Web.Services.Scenarios
         {
             _trackPoints.Clear();
             _processedPath.Clear();
-            _carTrail.Clear(); // Clear the trail on reset
+            _carTrail.Clear();
             _isDrawing = false;
         }
 
@@ -82,7 +81,7 @@ namespace Web.Services.Scenarios
             _trackPoints.Add(_trackPoints[0]); // Close loop
 
             _processedPath.Clear();
-            for (int i = 0; i < _trackPoints.Count - 1; i++)
+            for (int i = 0; i < _trackPoints.Count - 1; ++i)
             {
                 var p1 = _trackPoints[i];
                 var p2 = _trackPoints[i + 1];
@@ -91,7 +90,7 @@ namespace Web.Services.Scenarios
                 int steps = (int)(segmentDist / 0.5);
                 if (steps < 1) steps = 1;
 
-                for (int s = 0; s < steps; s++)
+                for (int s = 0; s < steps; ++s)
                 {
                     double t = (double)s / steps;
                     double px = p1[0] + (p2[0] - p1[0]) * t;

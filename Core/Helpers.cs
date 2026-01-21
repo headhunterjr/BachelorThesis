@@ -14,16 +14,16 @@ namespace Core
             if (colsA != rowsB)
             {
                 Console.WriteLine("Matrices are not compatible for multiplication.");
-                throw new InvalidOperationException("BRUH");
+                throw new InvalidOperationException();
             }
 
             double[,] result = new double[rowsA, colsB];
 
-            for (int i = 0; i < rowsA; i++)
+            for (int i = 0; i < rowsA; ++i)
             {
-                for (int j = 0; j < colsB; j++)
+                for (int j = 0; j < colsB; ++j)
                 {
-                    for (int k = 0; k < colsA; k++)
+                    for (int k = 0; k < colsA; ++k)
                     {
                         result[i, j] += A[i, k] * B[k, j];
                     }
@@ -31,20 +31,20 @@ namespace Core
             }
             return result;
         }
-        public static double[,] ToColumnVector(double[] arr)
+        public static double[,] ToColumnVector(double[] array)
         {
-            if (arr == null)
+            if (array == null)
             {
                 Console.WriteLine("Array is null.");
-                throw new ArgumentNullException(nameof(arr));
+                throw new ArgumentNullException(nameof(array));
             }
 
-            int n = arr.Length;
+            int n = array.Length;
             double[,] column = new double[n, 1];
 
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < n; ++i)
             {
-                column[i, 0] = arr[i];
+                column[i, 0] = array[i];
             }
 
             return column;
@@ -70,9 +70,9 @@ namespace Core
 
             double[,] result = new double[rowsA, colsA];
 
-            for (int i = 0; i < rowsA; i++)
+            for (int i = 0; i < rowsA; ++i)
             {
-                for (int j = 0; j < colsA; j++)
+                for (int j = 0; j < colsA; ++j)
                 {
                     result[i, j] = A[i, j] + B[i, j];
                 }
@@ -94,9 +94,9 @@ namespace Core
             int sourceRows = source.GetLength(0);
             int sourceCols = source.GetLength(1);
 
-            for (int i = 0; i < sourceRows; i++)
+            for (int i = 0; i < sourceRows; ++i)
             {
-                for (int j = 0; j < sourceCols; j++)
+                for (int j = 0; j < sourceCols; ++j)
                 {
                     target[startRow + i, startCol + j] = source[i, j];
                 }
@@ -109,7 +109,7 @@ namespace Core
 
             double[,] result = new double[rows * count, cols * count];
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; ++i)
             {
                 PlaceMatrix(result, block, startRow: i * rows, startCol: i * cols);
             }
@@ -122,9 +122,9 @@ namespace Core
             int cols = matrix.GetLength(1);
             double[,] result = new double[cols, rows];
 
-            for (int i = 0; i < rows; i++)
+            for (int i = 0; i < rows; ++i)
             {
-                for (int j = 0; j < cols; j++)
+                for (int j = 0; j < cols; ++j)
                 {
                     result[j, i] = matrix[i, j];
                 }

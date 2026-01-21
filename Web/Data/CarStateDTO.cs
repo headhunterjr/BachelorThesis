@@ -39,7 +39,6 @@
             }
         }
 
-        // Control conveniences mapped to Control indices
         public double Accel
         {
             get => Control.Length > 0 ? Control[0] : 0.0;

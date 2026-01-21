@@ -62,8 +62,6 @@
         }
     }
 
-    // === INTERACTION HANDLERS ===
-
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
@@ -96,7 +94,6 @@
         await DrawFrame();
     }
 
-    // === SIMULATION LOOP ===
 
     private void ToggleSim()
     {
@@ -123,7 +120,6 @@
 
     private async Task Tick()
     {
-        // Advances physics by one step (Sim.RunStep returns BaseStateDTO and updates global state)
         Sim.RunStep();
         await DrawFrame();
     }

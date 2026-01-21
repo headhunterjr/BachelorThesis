@@ -8,7 +8,7 @@
     const toScreenY = (y) => centerY - (y * scale);
 
     // === 1. DRAW TARGET (The Green Dot at 0,0) ===
-    ctx.fillStyle = "#00FF00"; // Bright Green
+    ctx.fillStyle = "#00FF00";
     ctx.beginPath();
     // Draw a circle at (0,0) with radius 1 meter (scaled)
     ctx.arc(toScreenX(0), toScreenY(0), 1.0 * scale, 0, 2 * Math.PI);

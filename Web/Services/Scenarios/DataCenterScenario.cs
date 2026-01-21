@@ -3,10 +3,8 @@ using Web.Data;
 
 namespace Web.Services.Scenarios
 {
-    // Data Center Thermal Management scenario (MPC)
     public class DataCenterScenario : ISimulationScenario
     {
-        // Model params (tune these if you change dt)
         private double alpha = 0.1;     // thermal gain factor (°C per heat unit per hour)
         private double beta = 1.0;      // cooling efficiency: heat units removed per unit u
         public double Tmax { get; set; } = 35.0;   // safety limit (°C)
@@ -36,7 +34,7 @@ namespace Web.Services.Scenarios
         public DataCenterScenario()
         {
             // default constant forecasts (fill a bit more than horizon)
-            for (int i = 0; i < HorizonSteps + 10; i++)
+            for (int i = 0; i < HorizonSteps + 10; ++i)
             {
                 ServerHeatForecast.Add(1.0); // nominal heat units
                 PriceForecast.Add(1.0);      // normalized price
@@ -60,7 +58,7 @@ namespace Web.Services.Scenarios
             int H = HorizonSteps;
             var heatForecast = new double[H];
             var priceForecast = new double[H];
-            for (int i = 0; i < H; i++)
+            for (int i = 0; i < H; ++i)
             {
                 heatForecast[i] = (i < ServerHeatForecast.Count) ? ServerHeatForecast[i] : ServerHeatForecast.LastOrDefault();
                 priceForecast[i] = (i < PriceForecast.Count) ? PriceForecast[i] : PriceForecast.LastOrDefault();
@@ -68,16 +66,19 @@ namespace Web.Services.Scenarios
 
             // initial guess u trajectory
             var u_traj = new List<double[]>();
-            for (int i = 0; i < H; i++) u_traj.Add(new double[] { 0.0 });
+            for (int i = 0; i < H; ++i)
+            {
+                u_traj.Add(new double[] { 0.0 });
+            }
 
             // iteration (simple)
-            for (int iter = 0; iter < MaxIters; iter++)
+            for (int iter = 0; iter < MaxIters; ++iter)
             {
                 // rollout
                 var x_traj = new List<double[]>();
                 double Tsim = Tnow;
                 x_traj.Add(new double[] { Tsim });
-                for (int t = 0; t < H; t++)
+                for (int t = 0; t < H; ++t)
                 {
                     double net = heatForecast[t] - beta * u_traj[t][0];
                     Tsim = Tsim + alpha * net * Dt;
@@ -95,13 +96,13 @@ namespace Web.Services.Scenarios
                 var A_const = new double[1, 1] { { 1.0 } };
                 var B_const = new double[1, 1] { { -alpha * beta * Dt } };
 
-                for (int t = 0; t < H; t++)
+                for (int t = 0; t < H; ++t)
                 {
                     A_list.Add((double[,])A_const.Clone());
                     B_list.Add((double[,])B_const.Clone());
                 }
 
-                for (int t = 0; t <= H; t++)
+                for (int t = 0; t <= H; ++t)
                 {
                     var Qm = new double[1, 1] { { WTemp } };
                     Q_list.Add(Qm);
@@ -112,7 +113,7 @@ namespace Web.Services.Scenarios
                     q_list.Add(new double[] { qv });
                 }
 
-                for (int t = 0; t < H; t++)
+                for (int t = 0; t < H; ++t)
                 {
                     double price = priceForecast[t];
                     var Rm = new double[1, 1] { { WEnergyBase * (price + 1e-6) } };
@@ -131,7 +132,7 @@ namespace Web.Services.Scenarios
 
                 var new_u_traj = new List<double[]>();
                 double[] xsim = new double[] { Tnow };
-                for (int t = 0; t < H; t++)
+                for (int t = 0; t < H; ++t)
                 {
                     var k = gains[t].k;
                     var K = gains[t].K;
@@ -195,7 +196,7 @@ namespace Web.Services.Scenarios
             {
                 ServerHeatForecast.Clear();
                 PriceForecast.Clear();
-                for (int i = 0; i < HorizonSteps + 10; i++)
+                for (int i = 0; i < HorizonSteps + 10; ++i)
                 {
                     ServerHeatForecast.Add(0.5);
                     PriceForecast.Add(0.4);

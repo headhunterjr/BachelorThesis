@@ -178,8 +178,6 @@
             }
             catch
             {
-                // If SetState not present or wrong shape, try previous API if available
-                // (silent fallback to not crash)
             }
 
             _mode = InteractionMode.None;
@@ -239,7 +237,6 @@
     private void Stop() { _timer?.Stop(); _timer = null; }
     private void Reset() { Stop(); Sim.Reset(); _currentCar = null; _ = Tick(); }
 
-    // Map generic BaseStateDTO -> CarStateDTO (used by the existing JS draw functions)
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
     {
         var car = new CarStateDTO();

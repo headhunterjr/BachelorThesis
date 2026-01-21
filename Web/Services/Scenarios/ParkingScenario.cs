@@ -8,7 +8,6 @@ namespace Web.Services.Scenarios
     {
         private List<Obstacle> _obstacles = new();
 
-        // Public Properties for UI Binding
         public int Horizon { get; set; } = 40;
         public double ObstacleRadius { get; set; } = 4.0;
         public double ObstacleWeight { get; set; } = 7500.0;

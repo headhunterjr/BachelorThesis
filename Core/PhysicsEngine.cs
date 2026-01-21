@@ -49,24 +49,24 @@
             double[] x_next_base = Step(x, u, dt);
 
             // A
-            for (int i = 0; i < nx; i++)
+            for (int i = 0; i < nx; ++i)
             {
                 var x_p = (double[])x.Clone();
                 x_p[i] += eps;
                 var x_next_p = Step(x_p, u, dt);
-                for (int j = 0; j < nx; j++)
+                for (int j = 0; j < nx; ++j)
                 {
                     A[j, i] = (x_next_p[j] - x_next_base[j]) / eps;
                 }
             }
 
             // B
-            for (int i = 0; i < nu; i++)
+            for (int i = 0; i < nu; ++i)
             {
                 var u_p = (double[])u.Clone();
                 u_p[i] += eps;
                 var x_next_p = Step(x, u_p, dt);
-                for (int j = 0; j < nx; j++)
+                for (int j = 0; j < nx; ++j)
                 {
                     B[j, i] = (x_next_p[j] - x_next_base[j]) / eps;
                 }
