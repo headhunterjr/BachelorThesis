@@ -8,74 +8,175 @@
 @using Web.Services.Scenarios
 @implements IDisposable
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-9 text-center p-3">
-            <h3>MPC Path Tracking (Parking)</h3>
-            <div class="alert alert-info py-1 mb-2">
-                <small><strong>Drag</strong> obstacles to move | <strong>Right-Click</strong> an obstacle to delete it.</small>
-            </div>
+<PageTitle>Parking Simulation - MPC Control Lab</PageTitle>
 
-            <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000; background: #f8f9fa; cursor: default;"></canvas>
+<div class="visualizer-container">
+    <div class="simulation-area">
+        <div class="simulation-header">
+            <h1 class="simulation-title">MPC Path Tracking</h1>
+            <div class="simulation-badge">Parking Scenario</div>
+        </div>
 
-            <div class="mt-3">
-                <button class="btn btn-success" @onclick="Start">Start</button>
-                <button class="btn btn-danger" @onclick="Stop">Stop</button>
-                <button class="btn btn-secondary" @onclick="Reset">Reset</button>
-
-                <div class="btn-group ms-3">
-                    <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-info")" @onclick="SetAddObstacleMode">
-                        @(_mode == InteractionMode.AddObstacle ? "Cancel Add" : "Add Obstacle")
-                    </button>
-                    <button class="btn @(_mode == InteractionMode.SetStart ? "btn-warning" : "btn-primary")" @onclick="SetStartPositionMode">
-                        @(_mode == InteractionMode.SetStart ? "Cancel Move" : "Move Car")
-                    </button>
-                </div>
-                <button class="btn btn-outline-danger ms-2" @onclick="ClearObstacles">Clear All Obstacles</button>
+        <div class="instructions-card">
+            <svg class="instruction-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+            </svg>
+            <div class="instruction-text">
+                <strong>Drag</strong> obstacles to move • <strong>Right-Click</strong> to delete • <strong>Click</strong> buttons to add or move vehicle
             </div>
         </div>
 
-        <div class="col-md-3 bg-light vh-100 border-start p-4 shadow-sm text-start" style="overflow-y: auto;">
-            <h4 class="mb-4">Control Panel</h4>
+        <div class="canvas-wrapper">
+            <canvas id="simCanvas" width="800" height="600"></canvas>
+        </div>
 
-            <section class="mb-4">
-                <h6 class="text-primary fw-bold">Initial State (For "Move Car")</h6>
-                <div class="mb-3">
-                    <label class="form-label small">Initial Velocity: <strong>@InitialVelocity.ToString("F1") m/s</strong></label>
+        <div class="control-buttons">
+            <div class="button-group primary-controls">
+                <button class="btn btn-success" @onclick="Start">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M3 3.732a1.5 1.5 0 012.305-1.265l6.706 4.267a1.5 1.5 0 010 2.531l-6.706 4.268A1.5 1.5 0 013 12.267V3.732z" />
+                    </svg>
+                    Start
+                </button>
+                <button class="btn btn-danger" @onclick="Stop">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <rect x="3" y="3" width="10" height="10" rx="1" />
+                    </svg>
+                    Stop
+                </button>
+                <button class="btn btn-secondary" @onclick="Reset">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 3a5 5 0 104.546 2.914.5.5 0 00-.908-.417A4 4 0 118 4v1H6.5a.5.5 0 000 1H9a.5.5 0 00.5-.5V2.5a.5.5 0 00-1 0V3z" />
+                    </svg>
+                    Reset
+                </button>
+            </div>
+
+            <div class="button-group secondary-controls">
+                <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-info")" @onclick="SetAddObstacleMode">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        @if (_mode == InteractionMode.AddObstacle)
+                        {
+                            <path fill-rule="evenodd" d="M4.646 4.646a.5.5 0 01.708 0L8 7.293l2.646-2.647a.5.5 0 01.708.708L8.707 8l2.647 2.646a.5.5 0 01-.708.708L8 8.707l-2.646 2.647a.5.5 0 01-.708-.708L7.293 8 4.646 5.354a.5.5 0 010-.708z" />
+                        }
+                        else
+                        {
+                            <path fill-rule="evenodd" d="M8 2a.5.5 0 01.5.5v5h5a.5.5 0 010 1h-5v5a.5.5 0 01-1 0v-5h-5a.5.5 0 010-1h5v-5A.5.5 0 018 2z" />
+                        }
+                    </svg>
+                    @(_mode == InteractionMode.AddObstacle ? "Cancel Add" : "Add Obstacle")
+                </button>
+                <button class="btn @(_mode == InteractionMode.SetStart ? "btn-warning" : "btn-primary")" @onclick="SetStartPositionMode">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        @if (_mode == InteractionMode.SetStart)
+                        {
+                            <path fill-rule="evenodd" d="M4.646 4.646a.5.5 0 01.708 0L8 7.293l2.646-2.647a.5.5 0 01.708.708L8.707 8l2.647 2.646a.5.5 0 01-.708.708L8 8.707l-2.646 2.647a.5.5 0 01-.708-.708L7.293 8 4.646 5.354a.5.5 0 010-.708z" />
+                        }
+                        else
+                        {
+                            <path d="M8 0a.5.5 0 01.5.5v5.793l2.146-2.147a.5.5 0 01.708.708l-3 3a.5.5 0 01-.708 0l-3-3a.5.5 0 11.708-.708L7.5 6.293V.5A.5.5 0 018 0z" />
+                        }
+                    </svg>
+                    @(_mode == InteractionMode.SetStart ? "Cancel Move" : "Move Car")
+                </button>
+            </div>
+
+            <button class="btn btn-outline-danger" @onclick="ClearObstacles">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M5.5 5.5A.5.5 0 016 6v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm2.5 0a.5.5 0 01.5.5v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm3 .5a.5.5 0 00-1 0v6a.5.5 0 001 0V6z" />
+                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 01-1 1H13v9a2 2 0 01-2 2H5a2 2 0 01-2-2V4h-.5a1 1 0 01-1-1V2a1 1 0 011-1H6a1 1 0 011-1h2a1 1 0 011 1h3.5a1 1 0 011 1v1zM4.118 4L4 4.059V13a1 1 0 001 1h6a1 1 0 001-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                </svg>
+                Clear All Obstacles
+            </button>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">Control Panel</h2>
+        </div>
+
+        <div class="panel-content">
+            <section class="control-section">
+                <h3 class="section-title">
+                    <svg class="section-icon" width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                    Initial State
+                </h3>
+                <p class="section-description">Configure starting position when moving the car</p>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        <span>Initial Velocity</span>
+                        <span class="control-value">@InitialVelocity.ToString("F1") m/s</span>
+                    </label>
                     <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="InitialVelocity" @bind-value:event="oninput" />
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small">Initial Angle: <strong>@InitialAngle.ToString("F2") rad</strong></label>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        <span>Initial Angle</span>
+                        <span class="control-value">@InitialAngle.ToString("F2") rad</span>
+                    </label>
                     <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="InitialAngle" @bind-value:event="oninput" />
                 </div>
             </section>
 
-            <hr />
-
             @if (Context != null)
             {
-                <section class="mb-4">
-                    <h6 class="text-secondary fw-bold">MPC Algorithm</h6>
-                    <div class="mb-3">
-                        <label class="form-label small">Horizon: <strong>@Context.Horizon</strong></label>
+                <div class="section-divider"></div>
+
+                <section class="control-section">
+                    <h3 class="section-title">
+                        <svg class="section-icon" width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                        </svg>
+                        MPC Algorithm
+                    </h3>
+                    <p class="section-description">Adjust prediction horizon and time step</p>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Horizon</span>
+                            <span class="control-value">@Context.Horizon</span>
+                        </label>
                         <input type="range" class="form-range" min="5" max="100" step="1" @bind-value="Context.Horizon" @bind-value:event="oninput" />
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small">Time Step (dt): <strong>@Sim.Dt.ToString("F2")s</strong></label>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Time Step (dt)</span>
+                            <span class="control-value">@Sim.Dt.ToString("F2")s</span>
+                        </label>
                         <input type="range" class="form-range" min="0.05" max="0.5" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
                     </div>
                 </section>
 
-                <hr />
+                <div class="section-divider"></div>
 
-                <section class="mb-4">
-                    <h6 class="text-danger fw-bold">Obstacle Parameters</h6>
-                    <div class="mb-3">
-                        <label class="form-label small">New Radius: <strong>@Context.ObstacleRadius.ToString("F1")m</strong></label>
+                <section class="control-section">
+                    <h3 class="section-title">
+                        <svg class="section-icon" width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+                        </svg>
+                        Obstacle Parameters
+                    </h3>
+                    <p class="section-description">Configure new obstacle properties</p>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>New Radius</span>
+                            <span class="control-value">@Context.ObstacleRadius.ToString("F1")m</span>
+                        </label>
                         <input type="range" class="form-range" min="1" max="15" step="0.5" @bind-value="Context.ObstacleRadius" @bind-value:event="oninput" />
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small">Weight: <strong>@Context.ObstacleWeight.ToString("N0")</strong></label>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Weight</span>
+                            <span class="control-value">@Context.ObstacleWeight.ToString("N0")</span>
+                        </label>
                         <input type="range" class="form-range" min="1000" max="50000" step="1000" @bind-value="Context.ObstacleWeight" @bind-value:event="oninput" />
                     </div>
                 </section>
@@ -83,19 +184,39 @@
 
             @if (_currentCar != null)
             {
-                <div class="card bg-dark text-white p-2 mt-auto">
-                    <h6 class="mb-1 small">Live Telemetry</h6>
-                    <code class="text-info" style="font-size: 0.75rem;">
-                        X: @(_currentCar.X.ToString("F2"))<br />
-                        Y: @(_currentCar.Y.ToString("F2"))<br />
-                        V: @(_currentCar.Velocity.ToString("F2"))<br />
-                        A: @(_currentCar.Theta.ToString("F2"))
-                    </code>
+                <div class="section-divider"></div>
+
+                <div class="telemetry-panel">
+                    <h3 class="telemetry-title">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                        </svg>
+                        Live Telemetry
+                    </h3>
+                    <div class="telemetry-grid">
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">X Position</div>
+                            <div class="telemetry-value">@(_currentCar.X.ToString("F2"))</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Y Position</div>
+                            <div class="telemetry-value">@(_currentCar.Y.ToString("F2"))</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Velocity</div>
+                            <div class="telemetry-value">@(_currentCar.Velocity.ToString("F2"))</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Angle</div>
+                            <div class="telemetry-value">@(_currentCar.Theta.ToString("F2"))</div>
+                        </div>
+                    </div>
                 </div>
             }
         </div>
     </div>
 </div>
+
 
 @code {
     private enum InteractionMode { None, AddObstacle, SetStart }
@@ -106,16 +227,13 @@
     private DotNetObjectReference<BasicVisualizer>? _objRef;
     private int _draggedIdx = -1;
 
-    // local initial state values (don't rely on SimulationService internals)
     private double InitialVelocity { get; set; } = 0.0;
     private double InitialAngle { get; set; } = 0.0;
 
-    // Helper to get typed scenario
     private ParkingScenario? Context => Sim.ActiveScenario as ParkingScenario;
 
     protected override async Task OnInitializedAsync()
     {
-        // Force parking mode when this page loads
         Sim.LoadScenario("parking");
     }
 
@@ -139,7 +257,6 @@
 
     private async Task Tick()
     {
-        // RunStep returns BaseStateDTO (scenario-specific subclass sometimes)
         BaseStateDTO baseDto;
         if (_timer != null)
         {
@@ -153,7 +270,6 @@
         _currentCar = MapBaseToCar(baseDto);
 
         var obstacles = Sim.GetCurrentVisuals();
-        // Using parking.js function — drawCar expects CarStateDTO
         await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
         await InvokeAsync(StateHasChanged);
     }
@@ -171,7 +287,6 @@
 
         if (_mode == InteractionMode.SetStart)
         {
-            // Set the full car state: [x, y, initialVelocity, initialAngle]
             try
             {
                 Sim.SetState(new double[] { x, y, InitialVelocity, InitialAngle });
@@ -185,7 +300,6 @@
             return;
         }
 
-        // Check for drag start
         if (Context != null)
         {
             var obstacles = Context.GetVisualizationData() as List<Obstacle>;
@@ -240,7 +354,6 @@
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
     {
         var car = new CarStateDTO();
-        // ensure arrays exist with expected sizes
         car.State = new double[4];
         car.Control = new double[2];
 
