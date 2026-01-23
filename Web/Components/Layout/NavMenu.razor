@@ -1,73 +1,29 @@
 ﻿<div class="nav-container">
     <div class="nav-header">
-        <div class="brand">
-            <div class="brand-icon">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="8" fill="url(#gradient1)" />
-                    <path d="M16 8L24 16L16 24L8 16L16 8Z" fill="white" opacity="0.9" />
-                    <defs>
-                        <linearGradient id="gradient1" x1="0" y1="0" x2="32" y2="32">
-                            <stop offset="0%" stop-color="#8B5CF6" />
-                            <stop offset="100%" stop-color="#6B46C1" />
-                        </linearGradient>
-                    </defs>
-                </svg>
-            </div>
-            <div class="brand-text">
-                <span class="brand-title">MPC</span>
-                <span class="brand-subtitle">Control Lab</span>
-            </div>
-        </div>
+        <div class="brand-title">MPC Lab</div>
     </div>
 
     <nav class="nav-menu">
-        <div class="nav-section">
-            <div class="nav-section-title">Navigation</div>
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                </svg>
-                <span class="nav-text">Home</span>
-            </NavLink>
-        </div>
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <svg class="nav-icon" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+            </svg>
+            Home
+        </NavLink>
 
-        <div class="nav-section">
-            <div class="nav-section-title">Simulations</div>
-            <NavLink class="nav-link" href="basicvisualizer">
-                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                    <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
-                </svg>
-                <span class="nav-text">Parking</span>
-            </NavLink>
+        <NavLink class="nav-link" href="basicvisualizer">
+            <svg class="nav-icon" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
+            </svg>
+            Parking
+        </NavLink>
 
-            <NavLink class="nav-link" href="racing">
-                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
-                </svg>
-                <span class="nav-text">Racing</span>
-            </NavLink>
-        </div>
-
-        <div class="nav-section">
-            <div class="nav-section-title">Examples</div>
-            <NavLink class="nav-link" href="counter">
-                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
-                </svg>
-                <span class="nav-text">Counter</span>
-            </NavLink>
-
-            <NavLink class="nav-link" href="weather">
-                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z" />
-                </svg>
-                <span class="nav-text">Weather</span>
-            </NavLink>
-        </div>
+        <NavLink class="nav-link" href="racing">
+            <svg class="nav-icon" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
+            </svg>
+            Racing
+        </NavLink>
     </nav>
-
-    <div class="nav-footer">
-        <div class="version-badge">v1.0.0</div>
-    </div>
 </div>

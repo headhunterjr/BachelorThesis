@@ -7,35 +7,49 @@
 @using Web.Services.Scenarios
 @implements IDisposable
 
-<div class="container-fluid h-100 d-flex flex-column">
-    <div class="row bg-dark text-white p-3 shadow-sm">
-        <div class="col-md-6 d-flex align-items-center">
-            <h3 class="m-0 me-3">🏎️ Path Tracking MPC</h3>
-            <span class="badge bg-secondary">Racing Mode</span>
-        </div>
-        <div class="col-md-6 text-end">
-            <button class="btn btn-outline-light btn-sm" @onclick="ResetTrack">Clear Track</button>
-            <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
-                @(_isRunning ? "Stop Simulation" : "Start Race")
-            </button>
-        </div>
-    </div>
+<PageTitle>Racing - MPC Lab</PageTitle>
 
-    <div class="row flex-grow-1">
-        <div class="col-md-12 bg-light p-0 position-relative d-flex justify-content-center align-items-center">
+<div class="visualizer-container">
+    <div class="simulation-area">
+        <div class="simulation-header">
+            <h1 class="simulation-title">Racing</h1>
+        </div>
 
-            <div class="position-absolute top-0 start-50 translate-middle-x mt-3 bg-white p-2 rounded shadow opacity-75" style="pointer-events: none;">
+        <div class="canvas-wrapper">
+            <canvas id="raceCanvas"></canvas>
+        </div>
+
+        <div class="control-buttons">
+            <div class="button-group">
+                <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
+                    @(_isRunning ? "Stop" : "Start")
+                </button>
+                <button class="btn btn-secondary" @onclick="ResetTrack">Reset</button>
+            </div>
+
+            <div class="button-group" style="justify-self: center;">
                 @if (_trackExists)
                 {
-                    <span class="text-success fw-bold">Track Ready. Click Start!</span>
+                    <span class="badge bg-success">Track Ready</span>
                 }
                 else
                 {
-                    <span class="text-primary fw-bold">Click and Drag to draw a loop!</span>
+                    <span class="badge bg-info">Draw a loop</span>
                 }
             </div>
 
-            <canvas id="raceCanvas" width="1000" height="700" style="background: #ffffff; cursor: pointer; box-shadow: 0 0 20px rgba(0,0,0,0.1);"></canvas>
+            <button class="btn btn-outline-danger" @onclick="ResetTrack">Clear Track</button>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="panel-content">
+            <section class="control-section">
+                <h3 class="section-title">Instructions</h3>
+                <p style="font-size: 0.8125rem; color: var(--text-light); line-height: 1.5;">
+                    Click and drag on the canvas to draw a racing track. Close the loop by connecting back to the start.
+                </p>
+            </section>
         </div>
     </div>
 </div>
@@ -48,7 +62,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Switch logic to Racing Scenario
         Sim.SetScenario(new RacingScenario());
     }
 
@@ -87,13 +100,17 @@
 
         Sim.HandleInteraction(0, 0, "EndDraw");
 
-        // Check if track was successfully created
         var data = Sim.GetCurrentVisuals() as RacingVisuals;
         _trackExists = (data != null && data.Track != null && data.Track.Count > 0);
 
         await DrawFrame();
     }
 
+    [JSInvokable]
+    public void HandleRightClick(double x, double y)
+    {
+        // Not used in racing
+    }
 
     private void ToggleSim()
     {
@@ -126,12 +143,10 @@
 
     private async Task DrawFrame()
     {
-        // Get the current state (DTO) without advancing physics
         var baseDto = Sim.GetCurrentState();
         var carDto = MapBaseToCar(baseDto);
         var visuals = Sim.GetCurrentVisuals();
 
-        // Call the specific racing draw function from racing.js
         await JS.InvokeVoidAsync("drawRacing", "raceCanvas", carDto, visuals);
         await InvokeAsync(StateHasChanged);
     }
@@ -144,7 +159,6 @@
         _ = DrawFrame();
     }
 
-    // Map BaseStateDTO -> CarStateDTO for drawing
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
     {
         var car = new CarStateDTO();

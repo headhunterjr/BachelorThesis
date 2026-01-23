@@ -11,6 +11,7 @@ namespace Web.Services.Scenarios
     {
         public List<double[]> Track { get; set; } = new();
         public List<double[]> Trail { get; set; } = new();
+        public List<double[]> RawPoints { get; set; } = new(); // Add raw drawing points
     }
 
     public class RacingScenario : ISimulationScenario
@@ -22,17 +23,17 @@ namespace Web.Services.Scenarios
         private bool _isDrawing = false;
         private double _trackWidth = 10.0;
 
-        private double[,] _Q = 
-            { 
-                { 20, 0, 0, 0 }, 
-                { 0, 20, 0, 0 }, 
-                { 0, 0, 10, 0 }, 
-                { 0, 0, 0, 200 } 
+        private double[,] _Q =
+            {
+                { 20, 0, 0, 0 },
+                { 0, 20, 0, 0 },
+                { 0, 0, 10, 0 },
+                { 0, 0, 0, 200 }
             };
-        private double[,] _R = 
-            { 
-                { 1, 0 }, 
-                { 0, 2000 } 
+        private double[,] _R =
+            {
+                { 1, 0 },
+                { 0, 2000 }
             };
 
         public void Reset()
@@ -59,6 +60,7 @@ namespace Web.Services.Scenarios
             if (mode == "StartDraw")
             {
                 _trackPoints.Clear();
+                _processedPath.Clear(); // Clear processed path when starting new drawing
                 _isDrawing = true;
                 _trackPoints.Add(new double[] { x, y });
             }
@@ -101,13 +103,14 @@ namespace Web.Services.Scenarios
             }
         }
 
-        // Return the DTO containing both Track and Trail
+        // Return the DTO containing Track, Trail, and RawPoints
         public object GetVisualizationData()
         {
             return new RacingVisuals
             {
                 Track = _processedPath,
-                Trail = _carTrail
+                Trail = _carTrail,
+                RawPoints = _isDrawing ? _trackPoints : new List<double[]>() // Show raw points only while drawing
             };
         }
 

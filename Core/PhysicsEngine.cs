@@ -3,9 +3,9 @@
     public static class PhysicsEngine
     {
         // Default kinematic bicycle model (configurable limits are public constants here)
-        public static double SteeringLimit = 0.8; // radians (~45deg)
+        public static double SteeringLimit = 0.6; // radians (~45deg)
         public static double AccelLimit = 10.0;   // m/s^2
-        public static double WheelBase = 2.5;     // meters
+        public static double WheelBase = 3.5;     // meters
 
         // 1. NON-LINEAR DYNAMICS (The "Real" World)
         // x = [x, y, v, theta]

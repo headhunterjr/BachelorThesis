@@ -16,11 +16,11 @@ namespace Web.Services.Scenarios
             { 10, 0, 0, 0 },
             { 0, 10, 0, 0 },
             { 0, 0, 100, 0 },
-            { 0, 0, 0, 10 }
+            { 0, 0, 0, 1 }
         };
         private double[,] _R = {
             { 1, 0 },
-            { 0, 1 }
+            { 0, 100 }
         };
 
         public void Reset()
