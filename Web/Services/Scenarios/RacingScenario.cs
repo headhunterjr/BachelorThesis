@@ -1,123 +1,201 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Core;
+﻿using Core;
 using Web.Data;
 
 namespace Web.Services.Scenarios
 {
-    // DTO for passing data to JavaScript
     public class RacingVisuals
     {
         public List<double[]> Track { get; set; } = new();
         public List<double[]> Trail { get; set; } = new();
-        public List<double[]> RawPoints { get; set; } = new(); // Add raw drawing points
+        public List<double[]> RawPoints { get; set; } = new();
     }
 
-    public class RacingScenario : ISimulationScenario
+    public class RacingScenario : ISimulationScenario, ICostModel
     {
-        private List<double[]> _trackPoints = new(); // Raw mouse points
-        private List<double[]> _processedPath = new(); // The Reference Line
-        private List<double[]> _carTrail = new(); // The actual path taken
-
+        private List<double[]> _trackPoints = new();
+        private List<double[]> _processedPath = new();
+        private List<double[]> _carTrail = new();
         private bool _isDrawing = false;
         private double _trackWidth = 10.0;
 
-        private double[,] _Q =
-            {
-                { 20, 0, 0, 0 },
-                { 0, 20, 0, 0 },
-                { 0, 0, 10, 0 },
-                { 0, 0, 0, 200 }
-            };
-        private double[,] _R =
-            {
-                { 1, 0 },
-                { 0, 2000 }
-            };
+        private double[,] _Q = {
+            { 20, 0, 0, 0 },
+            { 0, 20, 0, 0 },
+            { 0, 0, 10, 0 },
+            { 0, 0, 0, 200 }
+        };
+        private double[,] _R = {
+            { 1, 0 },
+            { 0, 2000 }
+        };
 
-        public void Reset()
+        private PhysicsEngine _physicsEngine;
+
+        public RacingScenario()
         {
-            _trackPoints.Clear();
-            _processedPath.Clear();
-            _carTrail.Clear();
-            _isDrawing = false;
+            // "Go-Kart" Physics: Aggressive, sharp turns
+            // WheelBase: 2.5 (Short)
+            // SteeringLimit: 0.8 (Wide)
+            _physicsEngine = new PhysicsEngine(2.5, 0.8, 10.0);
         }
+
+        public void Reset() { _trackPoints.Clear(); _processedPath.Clear(); _carTrail.Clear(); _isDrawing = false; }
 
         public BaseStateDTO RunStep(double dt, double[] carState)
         {
-            if (_processedPath.Count == 0) return new CarStateDTO { Control = new double[] { 0.0, 0.0 } };
-            _carTrail.Add(new double[] { carState[0], carState[1] });
-            var u = ILQR_Controller.Solve(carState, _Q, _R, new List<Obstacle>(), 30, 5, dt, GetPhysicsModel(), _processedPath, _trackWidth);
-            return new CarStateDTO
+            if (_processedPath.Count == 0)
             {
-                Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) }
-            };
+                return new CarStateDTO { Control = new double[] { 0.0, 0.0 } };
+            }
+            _carTrail.Add(new double[] { carState[0], carState[1] });
+
+            var u = ILQR_Controller.Solve(carState, 30, 5, dt, GetPhysicsModel(), this);
+            return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
+        }
+
+        public double Evaluate(double[] x, double[] u, double dt, int t)
+        {
+            double[] target = GetTargetState(x, t);
+            double cost = 0;
+
+            double[] err = new double[4];
+            for (int i = 0; i < 4; ++i)
+            {
+                err[i] = x[i] - target[i];
+            }
+
+            while (err[3] > Math.PI)
+            {
+                err[3] -= 2 * Math.PI;
+            }
+            while (err[3] < -Math.PI)
+            {
+                err[3] += 2 * Math.PI;
+            }
+
+            cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(err), _Q);
+
+            var uVec = Helpers.ToColumnVector(u);
+            cost += Helpers.VectorQuadForm(uVec, _R);
+
+            return cost;
+        }
+
+        public void GetDerivatives(double[] x, double[] u, double dt, int t, ref double[,] Q, ref double[,] R, ref double[] q, ref double[] r)
+        {
+            double[] target = GetTargetState(x, t);
+
+            double[] err = new double[4];
+            for (int i = 0; i < 4; ++i)
+            {
+                err[i] = x[i] - target[i];
+            }
+
+            while (err[3] > Math.PI)
+            {
+                err[3] -= 2 * Math.PI;
+            }
+            while (err[3] < -Math.PI)
+            {
+                err[3] += 2 * Math.PI;
+            }
+
+            var xVec = Helpers.ToColumnVector(err);
+            var q_std = Helpers.MultiplyMatrices(_Q, xVec);
+            for (int i = 0; i < 4; ++i)
+            {
+                q[i] = 2 * q_std[i, 0];
+                for (int j = 0; j < 4; ++j)
+                {
+                    Q[i, j] = 2 * _Q[i, j];
+                }
+            }
+            var uVec = Helpers.ToColumnVector(u);
+            var r_val = Helpers.MultiplyMatrices(_R, uVec);
+            for (int i = 0; i < 2; ++i)
+            {
+                r[i] = 2 * r_val[i, 0];
+                for (int j = 0; j < 2; ++j)
+                {
+                    R[i, j] = 2 * _R[i, j];
+                }
+            }
+        }
+
+        private double[] GetTargetState(double[] x, int t)
+        {
+            if (_processedPath.Count == 0)
+            {
+                return new double[4];
+            }
+            int closestIdx = 0;
+            double minDSq = double.MaxValue;
+            for (int i = 0; i < _processedPath.Count; ++i)
+            {
+                double d = Math.Pow(x[0] - _processedPath[i][0], 2) + Math.Pow(x[1] - _processedPath[i][1], 2);
+                if (d < minDSq)
+                {
+                    minDSq = d; closestIdx = i;
+                }
+            }
+            int lookAhead = (int)(t * 1.0);
+            if (lookAhead < 1)
+            {
+                lookAhead = 1;
+            }
+            int targetIdx = (closestIdx + lookAhead) % _processedPath.Count;
+            return _processedPath[targetIdx];
         }
 
         public void HandleInteraction(double x, double y, string mode)
         {
             if (mode == "StartDraw")
             {
-                _trackPoints.Clear();
-                _processedPath.Clear(); // Clear processed path when starting new drawing
-                _isDrawing = true;
-                _trackPoints.Add(new double[] { x, y });
+                _trackPoints.Clear(); _processedPath.Clear(); _isDrawing = true; _trackPoints.Add(new double[] { x, y });
             }
             else if (mode == "Drawing" && _isDrawing)
             {
                 var last = _trackPoints.Last();
-                double dist = Math.Sqrt(Math.Pow(x - last[0], 2) + Math.Pow(y - last[1], 2));
-                if (dist > 2.0) _trackPoints.Add(new double[] { x, y });
+                if (Math.Sqrt(Math.Pow(x - last[0], 2) + Math.Pow(y - last[1], 2)) > 2.0)
+                {
+                    _trackPoints.Add(new double[] { x, y });
+                }
             }
             else if (mode == "EndDraw")
             {
-                _isDrawing = false;
-                ProcessTrack();
+                _isDrawing = false; ProcessTrack();
             }
         }
 
         private void ProcessTrack()
         {
-            if (_trackPoints.Count < 3) return;
-            _trackPoints.Add(_trackPoints[0]); // Close loop
-
+            if (_trackPoints.Count < 3)
+            {
+                return;
+            }
+            _trackPoints.Add(_trackPoints[0]);
             _processedPath.Clear();
             for (int i = 0; i < _trackPoints.Count - 1; ++i)
             {
-                var p1 = _trackPoints[i];
-                var p2 = _trackPoints[i + 1];
-                double segmentDist = Math.Sqrt(Math.Pow(p2[0] - p1[0], 2) + Math.Pow(p2[1] - p1[1], 2));
-
-                int steps = (int)(segmentDist / 0.5);
-                if (steps < 1) steps = 1;
-
+                var p1 = _trackPoints[i]; var p2 = _trackPoints[i + 1];
+                double dist = Math.Sqrt(Math.Pow(p2[0] - p1[0], 2) + Math.Pow(p2[1] - p1[1], 2));
+                int steps = Math.Max(1, (int)(dist / 0.5));
                 for (int s = 0; s < steps; ++s)
                 {
                     double t = (double)s / steps;
-                    double px = p1[0] + (p2[0] - p1[0]) * t;
-                    double py = p1[1] + (p2[1] - p1[1]) * t;
                     double ang = Math.Atan2(p2[1] - p1[1], p2[0] - p1[0]);
-                    _processedPath.Add(new double[] { px, py, 15.0, ang });
+                    _processedPath.Add(new double[] { p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t, 15.0, ang });
                 }
             }
         }
 
-        // Return the DTO containing Track, Trail, and RawPoints
         public object GetVisualizationData()
         {
-            return new RacingVisuals
-            {
-                Track = _processedPath,
-                Trail = _carTrail,
-                RawPoints = _isDrawing ? _trackPoints : new List<double[]>() // Show raw points only while drawing
-            };
+            return new RacingVisuals { Track = _processedPath, Trail = _carTrail, RawPoints = _isDrawing ? _trackPoints : new List<double[]>() };
         }
-
         public PhysicsModel GetPhysicsModel()
         {
-            // The default bicycle model: nx=4, nu=2
-            return new PhysicsModel(PhysicsEngine.Step, PhysicsEngine.Linearize, 4, 2);
+            return new PhysicsModel(_physicsEngine.Step, _physicsEngine.Linearize, 4, 2);
         }
     }
 }

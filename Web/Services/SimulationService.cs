@@ -60,9 +60,15 @@ namespace Web.Services
             };
         }
 
-        public void HandleInteraction(double x, double y, string mode) => ActiveScenario?.HandleInteraction(x, y, mode);
+        public void HandleInteraction(double x, double y, string mode)
+        {
+            ActiveScenario?.HandleInteraction(x, y, mode);
+        }
 
-        public object GetCurrentVisuals() => ActiveScenario?.GetVisualizationData();
+        public object GetCurrentVisuals()
+        {
+            return ActiveScenario?.GetVisualizationData();
+        }
 
         public void Reset()
         {

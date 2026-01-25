@@ -1,10 +1,9 @@
-﻿using System.Collections.Generic;
-using Core;
+﻿using Core;
 using Web.Data;
 
 namespace Web.Services.Scenarios
 {
-    public class ParkingScenario : ISimulationScenario
+    public class ParkingScenario : ISimulationScenario, ICostModel
     {
         private List<Obstacle> _obstacles = new();
 
@@ -23,6 +22,17 @@ namespace Web.Services.Scenarios
             { 0, 100 }
         };
 
+        // Cache the physics engine so we don't recreate it every step
+        private PhysicsEngine _physicsEngine;
+
+        public ParkingScenario()
+        {
+            // "Limo" Physics: Smooth, stable, easier to control precisely
+            // WheelBase: 3.5 (Longer)
+            // SteeringLimit: 0.6 (Restricted)
+            _physicsEngine = new PhysicsEngine(3.5, 0.6, 10.0);
+        }
+
         public void Reset()
         {
             _obstacles.Clear();
@@ -31,11 +41,108 @@ namespace Web.Services.Scenarios
         public BaseStateDTO RunStep(double dt, double[] carState)
         {
             var state = carState != null && carState.Length >= 4 ? carState : new double[4];
-            var u = ILQR_Controller.Solve(carState, _Q, _R, _obstacles, Horizon, 5, dt, GetPhysicsModel(), null, 0);
-            return new CarStateDTO
+            var u = ILQR_Controller.Solve(state, Horizon, 5, dt, GetPhysicsModel(), this);
+            return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
+        }
+
+        public double Evaluate(double[] x, double[] u, double dt, int t)
+        {
+            double cost = 0;
+            double dist = Math.Sqrt(x[0] * x[0] + x[1] * x[1]);
+            double targetVel = (dist < 5.0) ? 0.0 : 10.0;
+            double[] target = { 0, 0, targetVel, 0 };
+
+            double[] err = new double[4];
+            for (int i = 0; i < 4; ++i)
             {
-                Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) }
-            };
+                err[i] = x[i] - target[i];
+            }
+
+            while (err[3] > Math.PI)
+            {
+                err[3] -= 2 * Math.PI;
+            }
+            while (err[3] < -Math.PI) 
+            { 
+                err[3] += 2 * Math.PI; 
+            }
+
+            cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(err), _Q);
+            cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(u), _R);
+
+            foreach (var obs in _obstacles)
+            {
+                double dSq = Math.Pow(x[0] - obs.X, 2) + Math.Pow(x[1] - obs.Y, 2);
+                cost += obs.Weight * Math.Exp(-dSq / (obs.Radius * obs.Radius));
+            }
+            return cost;
+        }
+
+        public void GetDerivatives(double[] x, double[] u, double dt, int t, ref double[,] Q, ref double[,] R, ref double[] q, ref double[] r)
+        {
+            double dist = Math.Sqrt(x[0] * x[0] + x[1] * x[1]);
+            double targetVel = (dist < 5.0) ? 0.0 : 10.0;
+            double[] target = { 0, 0, targetVel, 0 };
+
+            double[] err = new double[4];
+            for (int i = 0; i < 4; ++i)
+            {
+                err[i] = x[i] - target[i];
+            }
+
+            while (err[3] > Math.PI)
+            {
+                err[3] -= 2 * Math.PI;
+            }
+            while (err[3] < -Math.PI)
+            {
+                err[3] += 2 * Math.PI;
+            }
+
+            var xVec = Helpers.ToColumnVector(err);
+            var q_std = Helpers.MultiplyMatrices(_Q, xVec);
+            for (int i = 0; i < 4; ++i)
+            {
+                q[i] = 2 * q_std[i, 0];
+                for (int j = 0; j < 4; ++j)
+                {
+                    Q[i, j] = 2 * _Q[i, j];
+                }
+            }
+
+            var uVec = Helpers.ToColumnVector(u);
+            var r_val = Helpers.MultiplyMatrices(_R, uVec);
+            for (int i = 0; i < 2; ++i)
+            {
+                r[i] = 2 * r_val[i, 0];
+                for (int j = 0; j < 2; ++j)
+                {
+                    R[i, j] = 2 * _R[i, j];
+                }
+            }
+
+            foreach (var obs in _obstacles)
+            {
+                double dx = x[0] - obs.X;
+                double dy = x[1] - obs.Y;
+                double distSq = dx * dx + dy * dy;
+                double rSq = obs.Radius * obs.Radius;
+
+                double costVal = obs.Weight * Math.Exp(-distSq / rSq);
+                double factor = costVal * (-2.0 / rSq);
+
+                q[0] += factor * dx;
+                q[1] += factor * dy;
+
+                double hessFactor = -factor;
+                if (hessFactor < 0)
+                {
+                    hessFactor = 0;
+                }
+
+                Q[0, 0] += hessFactor;
+                Q[1, 1] += hessFactor;
+            }
         }
 
         public void HandleInteraction(double x, double y, string mode)
@@ -46,41 +153,34 @@ namespace Web.Services.Scenarios
             }
             else if (mode == "RemoveObstacle")
             {
-                // Simple radius check to remove
                 for (int i = 0; i < _obstacles.Count; i++)
                 {
-                    double dist = System.Math.Sqrt(System.Math.Pow(x - _obstacles[i].X, 2) + System.Math.Pow(y - _obstacles[i].Y, 2));
-                    if (dist < _obstacles[i].Radius)
+                    double d = Math.Sqrt(Math.Pow(x - _obstacles[i].X, 2) + Math.Pow(y - _obstacles[i].Y, 2));
+                    if (d < _obstacles[i].Radius)
                     {
-                        _obstacles.RemoveAt(i);
-                        break;
+                        _obstacles.RemoveAt(i); break;
                     }
                 }
             }
-            else if (mode == "UpdateDragged")
-            {
-                // This logic is usually handled by index in the UI, 
-                // but for simplicity we can handle drag updates in the UI or here.
-                // Keeping it simple for now, drag logic stays in Razor for index finding.
-            }
         }
 
-        // Helper to update specific obstacle (called from UI dragging)
         public void UpdateObstacle(int index, double x, double y)
         {
             if (index >= 0 && index < _obstacles.Count)
             {
-                _obstacles[index].X = x;
-                _obstacles[index].Y = y;
+                _obstacles[index].X = x; _obstacles[index].Y = y;
             }
         }
 
-        public object GetVisualizationData() => _obstacles;
+        public object GetVisualizationData()
+        {
+            return _obstacles;
+        }
 
+        // Wrap our configured instance in the PhysicsModel DTO
         public PhysicsModel GetPhysicsModel()
         {
-            // The default bicycle model: nx=4, nu=2
-            return new PhysicsModel(PhysicsEngine.Step, PhysicsEngine.Linearize, 4, 2);
+            return new PhysicsModel(_physicsEngine.Step, _physicsEngine.Linearize, 4, 2);
         }
     }
 }
