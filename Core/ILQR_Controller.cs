@@ -29,7 +29,7 @@ namespace Core
                 {
                     // Pass 't' here
                     totalCost += costModel.Evaluate(xCurrent, u_trajectory[t], dt, t);
-                    xCurrent = physicsModel.Step(xCurrent, u_trajectory[t], dt);
+                    xCurrent = physicsModel.Step(xCurrent, u_trajectory[t], dt, t);
                     x_trajectory.Add(xCurrent);
                 }
                 // Terminal cost (t = horizon)
@@ -52,7 +52,7 @@ namespace Core
                 {
                     if (t < horizon)
                     {
-                        var (At, Bt) = physicsModel.Linearize(x_trajectory[t], u_trajectory[t], dt);
+                        var (At, Bt) = physicsModel.Linearize(x_trajectory[t], u_trajectory[t], dt, t);
                         A_list.Add(At);
                         B_list.Add(Bt);
                     }
@@ -117,7 +117,7 @@ namespace Core
                         cand_u.Add(u_update);
                         // Pass 't'
                         currentAlphaCost += costModel.Evaluate(xSim, u_update, dt, t);
-                        xSim = physicsModel.Step(xSim, u_update, dt);
+                        xSim = physicsModel.Step(xSim, u_update, dt, t);
                         cand_x.Add(xSim);
                     }
                     // Pass 'horizon' for terminal cost

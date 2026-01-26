@@ -1,0 +1,218 @@
+﻿@page "/grid"
+@inject SimulationService Sim
+@inject IJSRuntime JS
+@using System.Timers
+@using Web.Data
+@using Web.Services
+@using Web.Services.Scenarios
+@implements IDisposable
+
+<PageTitle>Smart Grid - MPC Lab</PageTitle>
+
+<div class="visualizer-container">
+    <div class="simulation-area">
+        <div class="simulation-header">
+            <h1 class="simulation-title">Smart Grid Optimization</h1>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="gridCanvas"></canvas>
+        </div>
+
+        <div class="control-buttons">
+            <div class="button-group">
+                <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
+                    @(_isRunning ? "Stop" : "Start Day")
+                </button>
+                <button class="btn btn-primary" @onclick="RunSingleStep">Step (+1 Hr)</button>
+                <button class="btn btn-secondary" @onclick="Reset">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="panel-content">
+            @if (Context != null)
+            {
+                <section class="control-section">
+                    <h3 class="section-title">Environment</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Season</span>
+                            <span class="control-value">@Context.Season</span>
+                        </label>
+                        <button class="btn btn-sm @(Context.Season == "Summer" ? "btn-warning" : "btn-info")"
+                                style="width: 100%"
+                                @onclick='() => ToggleConfig("NextSeason")'>
+                            Toggle Season
+                        </button>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Grid Status</span>
+                            <span class="control-value" style="color: @(Context.IsBlackout ? "#EF4444" : "#10B981")">
+                                @(Context.IsBlackout ? "BLACKOUT" : "ONLINE")
+                            </span>
+                        </label>
+                        <button class="btn btn-sm btn-outline-danger"
+                                style="width: 100%"
+                                @onclick='() => ToggleConfig("ToggleBlackout")'>
+                            Simulate Blackout
+                        </button>
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Infrastructure</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Solar Array</span>
+                            <span class="control-value">@(Context.HasSolar ? "Installed" : "None")</span>
+                        </label>
+                        <button class="btn btn-sm btn-secondary" style="width: 100%" @onclick='() => ToggleConfig("ToggleSolar")'>
+                            Toggle Solar
+                        </button>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Diesel Gen</span>
+                            <span class="control-value">@(Context.HasGenerator ? "Ready" : "Disabled")</span>
+                        </label>
+                        <button class="btn btn-sm btn-secondary" style="width: 100%" @onclick='() => ToggleConfig("ToggleGen")'>
+                            Toggle Generator
+                        </button>
+                    </div>
+                </section>
+
+                @if (_visuals != null)
+                {
+                    <div class="telemetry-panel">
+                        <h3 class="telemetry-title">Forecast Results</h3>
+                        <div class="telemetry-grid">
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Time</div>
+                                <div class="telemetry-value">@((_visuals.CurrentStep / 2.0).ToString("F1")) h</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Battery</div>
+                                <div class="telemetry-value">@(_visuals.PlannedBattery[_visuals.CurrentStep > 0 ? _visuals.CurrentStep - 1 : 0].ToString("F1")) kWh</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Acc. Cost</div>
+                                <div class="telemetry-value" style="grid-column: span 2;">$@(_visuals.CurrentCost.ToString("F2"))</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private DotNetObjectReference<GridVisualizer>? _objRef;
+    private GridVisuals? _visuals;
+    private Timer? _timer;
+    private bool _isRunning = false;
+
+    private SmartGridScenario? Context => Sim.ActiveScenario as SmartGridScenario;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Sim.LoadScenario("grid");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initCanvasEvents", "gridCanvas", _objRef);
+            await UpdateVisuals();
+        }
+    }
+
+    private void ToggleSim()
+    {
+        if (_isRunning) Stop(); else Start();
+    }
+
+    private void Start()
+    {
+        if (_timer != null) return;
+
+        // Run faster than real time (200ms per "hour" step)
+        _timer = new Timer(200);
+        _timer.Elapsed += async (s, e) => await InvokeAsync(async () => await Tick());
+        _timer.Start();
+        _isRunning = true;
+    }
+
+    private void Stop()
+    {
+        _timer?.Stop();
+        _timer = null;
+        _isRunning = false;
+    }
+
+    private async Task Tick()
+    {
+        // 1. Advance Simulation
+        Sim.RunStep();
+
+        // 2. Refresh UI
+        await UpdateVisuals();
+
+        // 3. Auto-stop if we reach end of profile
+        if (_visuals != null && _visuals.CurrentStep >= _visuals.DemandProfile.Length)
+        {
+            Stop();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunSingleStep()
+    {
+        Stop(); // Ensure auto-play is off if stepping manually
+        await Tick();
+    }
+
+    private async Task ToggleConfig(string mode)
+    {
+        Sim.HandleInteraction(0, 0, mode);
+        await UpdateVisuals();
+    }
+
+    private async Task Reset()
+    {
+        Stop();
+        Sim.Reset();
+        await UpdateVisuals();
+    }
+
+    private async Task UpdateVisuals()
+    {
+        _visuals = Sim.GetCurrentVisuals() as GridVisuals;
+        if (_visuals != null)
+        {
+            await JS.InvokeVoidAsync("drawGrid", "gridCanvas", _visuals);
+        }
+        StateHasChanged();
+    }
+
+    // Required by common.js
+    [JSInvokable] public void HandleMouseDown(double x, double y) { }
+    [JSInvokable] public void HandleMouseMove(double x, double y) { }
+    [JSInvokable] public void HandleMouseUp() { }
+    [JSInvokable] public void HandleRightClick(double x, double y) { }
+
+    public void Dispose()
+    {
+        Stop();
+        _objRef?.Dispose();
+    }
+}

@@ -18,7 +18,7 @@ namespace Core
         }
 
         // 1. NON-LINEAR DYNAMICS (Uses instance properties now)
-        public double[] Step(double[] x, double[] u, double dt)
+        public double[] Step(double[] x, double[] u, double dt, int t)
         {
             double px = x[0];
             double py = x[1];
@@ -58,7 +58,7 @@ namespace Core
         }
 
         // 2. LINEARIZATION
-        public (double[,], double[,]) Linearize(double[] x, double[] u, double dt)
+        public (double[,], double[,]) Linearize(double[] x, double[] u, double dt, int t)
         {
             int nx = x.Length;
             int nu = u.Length;
@@ -68,14 +68,14 @@ namespace Core
             double[,] B = new double[nx, nu];
 
             // Calls the instance method Step()
-            double[] x_next_base = Step(x, u, dt);
+            double[] x_next_base = Step(x, u, dt, t);
 
             // A Matrix
             for (int i = 0; i < nx; ++i)
             {
                 var x_p = (double[])x.Clone();
                 x_p[i] += eps;
-                var x_next_p = Step(x_p, u, dt);
+                var x_next_p = Step(x_p, u, dt, t);
                 for (int j = 0; j < nx; ++j)
                 {
                     A[j, i] = (x_next_p[j] - x_next_base[j]) / eps;
@@ -87,7 +87,7 @@ namespace Core
             {
                 var u_p = (double[])u.Clone();
                 u_p[i] += eps;
-                var x_next_p = Step(x, u_p, dt);
+                var x_next_p = Step(x, u_p, dt, t);
                 for (int j = 0; j < nx; ++j)
                 {
                     B[j, i] = (x_next_p[j] - x_next_base[j]) / eps;

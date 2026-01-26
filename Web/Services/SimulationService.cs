@@ -7,7 +7,8 @@ namespace Web.Services
     {
         public ISimulationScenario ActiveScenario { get; private set; }
         private double[] _realState = Array.Empty<double>();
-        private Func<double[], double[], double, double[]> _physicsStep;
+        private Func<double[], double[], double, int, double[]> _physicsStep;
+        private int _currentTimeStep = 0;
         public double Dt { get; set; } = 0.1;
         public SimulationService()
         {
@@ -18,7 +19,7 @@ namespace Web.Services
             ActiveScenario = scenario ?? throw new ArgumentNullException(nameof(scenario));
             var pm = ActiveScenario.GetPhysicsModel() ?? throw new InvalidOperationException("Scenario must provide a PhysicsModel.");
             _realState = new double[pm.Nx];
-            _physicsStep = pm.Step ?? ((x, u, dt) => x);
+            _physicsStep = pm.Step ?? ((x, u, dt, t) => x);
             ActiveScenario.Reset();
         }
 
@@ -26,7 +27,7 @@ namespace Web.Services
         {
             if (name == "parking") SetScenario(new ParkingScenario());
             else if (name == "racing") SetScenario(new RacingScenario());
-            else if (name == "datacenter") SetScenario(new DataCenterScenario());
+            else if (name == "grid") SetScenario(new SmartGridScenario());
             else throw new ArgumentException($"Unknown scenario '{name}'");
         }
 
@@ -38,13 +39,14 @@ namespace Web.Services
             var control = result.Control ?? Array.Empty<double>();
             try
             {
-                var newState = _physicsStep != null ? _physicsStep(_realState, control, Dt) : _realState;
+                var newState = _physicsStep != null ? _physicsStep(_realState, control, Dt, _currentTimeStep) : _realState;
                 if (newState != null) _realState = newState;
             }
             catch
             {
             }
 
+            ++_currentTimeStep;
             result.State = (double[])_realState.Clone();
             result.Control = control.Length > 0 ? control : Array.Empty<double>();
 
@@ -72,6 +74,7 @@ namespace Web.Services
 
         public void Reset()
         {
+            _currentTimeStep = 0;
             for (int i = 0; i < _realState.Length; i++) _realState[i] = 0.0;
             ActiveScenario?.Reset();
         }
