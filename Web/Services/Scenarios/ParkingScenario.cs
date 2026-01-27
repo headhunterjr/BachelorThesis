@@ -7,9 +7,54 @@ namespace Web.Services.Scenarios
     {
         private List<Obstacle> _obstacles = new();
 
-        public int Horizon { get; set; } = 40;
+        public int Horizon { get; set; } = 50;
         public double ObstacleRadius { get; set; } = 4.0;
-        public double ObstacleWeight { get; set; } = 7500.0;
+        public double ObstacleWeight { get; set; } = 50000.0;
+
+        private Enums.CarType _carType = Enums.CarType.Sedan;
+        public Enums.CarType CurrentCarType
+        {
+            get => _carType;
+            set
+            {
+                _carType = value;
+                UpdatePhysicsEngine();
+            }
+        }
+
+        public double PrecisionPosition
+        {
+            get => _Q[0, 0];
+            set
+            {
+                _Q[0, 0] = value; // X precision
+                _Q[1, 1] = value; // Y precision
+            }
+        }
+
+        public double PrecisionVelocity
+        {
+            get => _Q[2, 2];
+            set => _Q[2, 2] = value;
+        }
+
+        public double PrecisionAngle
+        {
+            get => _Q[3, 3];
+            set => _Q[3, 3] = value;
+        }
+
+        public double SmoothnessAccel
+        {
+            get => _R[0, 0];
+            set => _R[0, 0] = value;
+        }
+
+        public double SmoothnessSteering
+        {
+            get => _R[1, 1];
+            set => _R[1, 1] = value;
+        }
 
         private double[,] _Q = {
             { 10, 0, 0, 0 },
@@ -19,7 +64,7 @@ namespace Web.Services.Scenarios
         };
         private double[,] _R = {
             { 1, 0 },
-            { 0, 100 }
+            { 0, 10000 }
         };
 
         // Cache the physics engine so we don't recreate it every step
@@ -27,10 +72,27 @@ namespace Web.Services.Scenarios
 
         public ParkingScenario()
         {
-            // "Limo" Physics: Smooth, stable, easier to control precisely
-            // WheelBase: 3.5 (Longer)
-            // SteeringLimit: 0.6 (Restricted)
-            _physicsEngine = new PhysicsEngine(3.5, 0.6, 10.0);
+            UpdatePhysicsEngine();
+        }
+
+        private void UpdatePhysicsEngine()
+        {
+            switch (_carType)
+            {
+                case Enums.CarType.GoKart:
+                    // Twitchy, agile, small turning radius
+                    _physicsEngine = new PhysicsEngine(1.5, 0.8, 15.0);
+                    break;
+                case Enums.CarType.Limo:
+                    // Heavy, slow turning, stable
+                    _physicsEngine = new PhysicsEngine(3.5, 0.5, 8.0);
+                    break;
+                case Enums.CarType.Sedan:
+                default:
+                    // Balanced
+                    _physicsEngine = new PhysicsEngine(2.5, 0.7, 10.0);
+                    break;
+            }
         }
 
         public void Reset()

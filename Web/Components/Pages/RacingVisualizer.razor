@@ -43,26 +43,140 @@
     </div>
 
     <div class="control-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">Controls</h2>
+        </div>
+
         <div class="panel-content">
-            <section class="control-section">
-                <h3 class="section-title">Instructions</h3>
-                <p style="font-size: 0.8125rem; color: var(--text-light); line-height: 1.5;">
-                    Click and drag on the canvas to draw a racing track. Close the loop by connecting back to the start.
-                </p>
-            </section>
+            @if (Context != null)
+            {
+                <section class="control-section">
+                    <h3 class="section-title">Car Type</h3>
+                    <div class="btn-group" style="width: 100%; margin-bottom: 1rem;">
+                        <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.GoKart ? "btn-primary" : "btn-secondary")"
+                                @onclick='() => SetCarType(Enums.CarType.GoKart)' style="flex: 1;">
+                            Kart
+                        </button>
+                        <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Sedan ? "btn-primary" : "btn-secondary")"
+                                @onclick='() => SetCarType(Enums.CarType.Sedan)' style="flex: 1;">
+                            Sedan
+                        </button>
+                        <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Limo ? "btn-primary" : "btn-secondary")"
+                                @onclick='() => SetCarType(Enums.CarType.Limo)' style="flex: 1;">
+                            Limo
+                        </button>
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Track Following (Q)</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">Position Precision</label>
+                        <input type="number" class="form-control" step="1"
+                               @bind-value="Context.PrecisionPosition" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Velocity Precision</label>
+                        <input type="number" class="form-control" step="1"
+                               @bind-value="Context.PrecisionVelocity" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Angle Precision</label>
+                        <input type="number" class="form-control" step="10"
+                               @bind-value="Context.PrecisionAngle" @bind-value:event="oninput" />
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Driving Style (R)</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">Accel Smoothness</label>
+                        <input type="number" class="form-control" step="0.1"
+                               @bind-value="Context.SmoothnessAccel" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Steer Smoothness</label>
+                        <input type="number" class="form-control" step="100"
+                               @bind-value="Context.SmoothnessSteering" @bind-value:event="oninput" />
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Simulation</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Horizon</span>
+                            <span class="control-value">@Context.Horizon</span>
+                        </label>
+                        <input type="range" class="form-range" min="10" max="60" step="1" @bind-value="Context.Horizon" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Time Step (dt)</span>
+                            <span class="control-value">@Sim.Dt.ToString("F3")</span>
+                        </label>
+                        <input type="range" class="form-range" min="0.01" max="0.2" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
+                    </div>
+                </section>
+            }
+            else
+            {
+                <section class="control-section">
+                    <h3 class="section-title">Instructions</h3>
+                    <p style="font-size: 0.8125rem; color: var(--text-light); line-height: 1.5;">
+                        Click and drag on the canvas to draw a racing track. Close the loop by connecting back to the start.
+                    </p>
+                </section>
+            }
+
+            @if (_currentCar != null)
+            {
+                <div class="telemetry-panel">
+                    <h3 class="telemetry-title">Telemetry</h3>
+                    <div class="telemetry-grid">
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">X</div>
+                            <div class="telemetry-value">@(_currentCar.X.ToString("F2"))</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Y</div>
+                            <div class="telemetry-value">@(_currentCar.Y.ToString("F2"))</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Velocity</div>
+                            <div class="telemetry-value">@(Math.Abs(_currentCar.Velocity).ToString("F2"))</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Angle</div>
+                            <div class="telemetry-value">@(_currentCar.Theta.ToString("F2"))</div>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
 
 @code {
     private Timer? _timer;
+    private CarStateDTO? _currentCar;
     private DotNetObjectReference<RacingVisualizer>? _objRef;
     private bool _isRunning = false;
     private bool _trackExists = false;
 
+    private RacingScenario? Context => Sim.ActiveScenario as RacingScenario;
+
     protected override async Task OnInitializedAsync()
     {
-        Sim.SetScenario(new RacingScenario());
+        Sim.LoadScenario("racing");
+        Sim.Dt = 0.1;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -75,10 +189,21 @@
         }
     }
 
+    private void SetCarType(Enums.CarType type)
+    {
+        if (Context != null)
+        {
+            Context.CurrentCarType = type;
+        }
+    }
+
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
-        if (_isRunning) return;
+        if (_isRunning) 
+        {
+            return;
+        }
 
         Sim.HandleInteraction(x, y, "StartDraw");
         await DrawFrame();
@@ -87,7 +212,10 @@
     [JSInvokable]
     public async Task HandleMouseMove(double x, double y)
     {
-        if (_isRunning) return;
+        if (_isRunning) 
+        {
+            return;
+        }
 
         Sim.HandleInteraction(x, y, "Drawing");
         await DrawFrame();
@@ -96,7 +224,10 @@
     [JSInvokable]
     public async Task HandleMouseUp()
     {
-        if (_isRunning) return;
+        if (_isRunning) 
+        {
+            return;
+        }
 
         Sim.HandleInteraction(0, 0, "EndDraw");
 
@@ -114,13 +245,26 @@
 
     private void ToggleSim()
     {
-        if (_isRunning) Stop(); else Start();
+        if (_isRunning) 
+        {
+            Stop();
+        }
+        else 
+        {
+            Start();
+        }
     }
 
     private void Start()
     {
-        if (!_trackExists) return;
-        if (_timer != null) return;
+        if (!_trackExists) 
+        {
+            return;
+        }
+        if (_timer != null) 
+        {
+            return;
+        }
 
         _timer = new Timer(Sim.Dt * 1000);
         _timer.Elapsed += async (s, e) => await Tick();
@@ -144,10 +288,10 @@
     private async Task DrawFrame()
     {
         var baseDto = Sim.GetCurrentState();
-        var carDto = MapBaseToCar(baseDto);
+        _currentCar = MapBaseToCar(baseDto); // Store state for telemetry
         var visuals = Sim.GetCurrentVisuals();
 
-        await JS.InvokeVoidAsync("drawRacing", "raceCanvas", carDto, visuals);
+        await JS.InvokeVoidAsync("drawRacing", "raceCanvas", _currentCar, visuals);
         await InvokeAsync(StateHasChanged);
     }
 
@@ -166,13 +310,17 @@
         car.Control = new double[2];
         if (baseDto?.State != null)
         {
-            for (int i = 0; i < Math.Min(baseDto.State.Length, 4); i++)
+            for (int i = 0; i < Math.Min(baseDto.State.Length, 4); ++i)
+            {
                 car.State[i] = baseDto.State[i];
+            }
         }
         if (baseDto?.Control != null)
         {
-            for (int i = 0; i < Math.Min(baseDto.Control.Length, 2); i++)
+            for (int i = 0; i < Math.Min(baseDto.Control.Length, 2); ++i)
+            {
                 car.Control[i] = baseDto.Control[i];
+            }
         }
         return car;
     }

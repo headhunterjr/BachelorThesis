@@ -113,6 +113,27 @@
     width: 100%;
 }
 
+.form-control {
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text);
+    background-color: var(--bg);
+    background-clip: padding-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+    .form-control:focus {
+        color: var(--text);
+        background-color: var(--bg);
+        border-color: var(--primary);
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(124, 58, 237, 0.25);
+    }
 .simulation-area {
     flex: 1;
     display: flex;

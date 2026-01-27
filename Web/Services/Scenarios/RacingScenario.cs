@@ -1,5 +1,7 @@
 ﻿using Core;
 using Web.Data;
+using static Web.Data.Enums;
+using static Web.Services.Scenarios.ParkingScenario;
 
 namespace Web.Services.Scenarios
 {
@@ -18,6 +20,55 @@ namespace Web.Services.Scenarios
         private bool _isDrawing = false;
         private double _trackWidth = 10.0;
 
+        public int Horizon { get; set; } = 30; // Default lower than parking for speed
+
+        // 2. Car Type
+        private Enums.CarType _carType = Enums.CarType.GoKart; // Default to GoKart for racing
+        public Enums.CarType CurrentCarType
+        {
+            get => _carType;
+            set
+            {
+                _carType = value;
+                UpdatePhysicsEngine();
+            }
+        }
+
+        // Cost to deviate from the track line (Cross-Track Error)
+        public double PrecisionPosition
+        {
+            get => _Q[0, 0];
+            set { _Q[0, 0] = value; _Q[1, 1] = value; }
+        }
+
+        // Cost to deviate from target velocity
+        public double PrecisionVelocity
+        {
+            get => _Q[2, 2];
+            set => _Q[2, 2] = value;
+        }
+
+        // Cost to deviate from track angle (Heading Error)
+        public double PrecisionAngle
+        {
+            get => _Q[3, 3];
+            set => _Q[3, 3] = value;
+        }
+
+        // 4. Matrix Weights (R - Smoothness)
+
+        public double SmoothnessAccel
+        {
+            get => _R[0, 0];
+            set => _R[0, 0] = value;
+        }
+
+        public double SmoothnessSteering
+        {
+            get => _R[1, 1];
+            set => _R[1, 1] = value;
+        }
+
         private double[,] _Q = {
             { 20, 0, 0, 0 },
             { 0, 20, 0, 0 },
@@ -33,13 +84,36 @@ namespace Web.Services.Scenarios
 
         public RacingScenario()
         {
-            // "Go-Kart" Physics: Aggressive, sharp turns
-            // WheelBase: 2.5 (Short)
-            // SteeringLimit: 0.8 (Wide)
-            _physicsEngine = new PhysicsEngine(2.5, 0.8, 10.0);
+            UpdatePhysicsEngine();
         }
 
-        public void Reset() { _trackPoints.Clear(); _processedPath.Clear(); _carTrail.Clear(); _isDrawing = false; }
+        private void UpdatePhysicsEngine()
+        {
+            switch (_carType)
+            {
+                case CarType.GoKart:
+                    // Twitchy, agile, small turning radius
+                    _physicsEngine = new PhysicsEngine(1.5, 0.8, 15.0);
+                    break;
+                case CarType.Limo:
+                    // Heavy, slow turning, stable
+                    _physicsEngine = new PhysicsEngine(3.5, 0.5, 8.0);
+                    break;
+                case CarType.Sedan:
+                default:
+                    // Balanced
+                    _physicsEngine = new PhysicsEngine(2.5, 0.7, 10.0);
+                    break;
+            }
+        }
+
+        public void Reset()
+        {
+            _trackPoints.Clear(); 
+            _processedPath.Clear(); 
+            _carTrail.Clear(); 
+            _isDrawing = false;
+        }
 
         public BaseStateDTO RunStep(double dt, double[] carState)
         {

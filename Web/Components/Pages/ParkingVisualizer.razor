@@ -1,4 +1,4 @@
-﻿@page "/basicvisualizer"
+﻿@page "/parking"
 @inject SimulationService Sim
 @inject IJSRuntime JS
 @using System.Timers
@@ -46,45 +46,81 @@
         </div>
 
         <div class="panel-content">
-            <section class="control-section">
-                <h3 class="section-title">Initial State</h3>
-
-                <div class="control-group">
-                    <label class="control-label">
-                        <span>Velocity</span>
-                        <span class="control-value">@InitialVelocity.ToString("F1")</span>
-                    </label>
-                    <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="InitialVelocity" @bind-value:event="oninput" />
-                </div>
-
-                <div class="control-group">
-                    <label class="control-label">
-                        <span>Angle</span>
-                        <span class="control-value">@InitialAngle.ToString("F2")</span>
-                    </label>
-                    <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="InitialAngle" @bind-value:event="oninput" />
-                </div>
-            </section>
-
             @if (Context != null)
             {
                 <section class="control-section">
-                    <h3 class="section-title">MPC</h3>
+                    <h3 class="section-title">Car Type</h3>
+                    <div class="btn-group" style="width: 100%; margin-bottom: 1rem;">
+                        <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.GoKart ? "btn-primary" : "btn-secondary")"
+                                @onclick='() => SetCarType(Enums.CarType.GoKart)' style="flex: 1;">
+                            Kart
+                        </button>
+                        <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Sedan ? "btn-primary" : "btn-secondary")"
+                                @onclick='() => SetCarType(Enums.CarType.Sedan)' style="flex: 1;">
+                            Sedan
+                        </button>
+                        <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Limo ? "btn-primary" : "btn-secondary")"
+                                @onclick='() => SetCarType(Enums.CarType.Limo)' style="flex: 1;">
+                            Limo
+                        </button>
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Solver Tuning (Precision)</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">Position (X/Y)</label>
+                        <input type="number" class="form-control" step="1"
+                               @bind-value="Context.PrecisionPosition" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Velocity</label>
+                        <input type="number" class="form-control" step="10"
+                               @bind-value="Context.PrecisionVelocity" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Angle</label>
+                        <input type="number" class="form-control" step="0.1"
+                               @bind-value="Context.PrecisionAngle" @bind-value:event="oninput" />
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Driving Style (Smoothness)</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">Acceleration</label>
+                        <input type="number" class="form-control" step="0.1"
+                               @bind-value="Context.SmoothnessAccel" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Steering</label>
+                        <input type="number" class="form-control" step="100"
+                               @bind-value="Context.SmoothnessSteering" @bind-value:event="oninput" />
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Simulation</h3>
 
                     <div class="control-group">
                         <label class="control-label">
                             <span>Horizon</span>
                             <span class="control-value">@Context.Horizon</span>
                         </label>
-                        <input type="range" class="form-range" min="5" max="100" step="1" @bind-value="Context.Horizon" @bind-value:event="oninput" />
+                        <input type="range" class="form-range" min="10" max="100" step="1" @bind-value="Context.Horizon" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Time Step</span>
-                            <span class="control-value">@Sim.Dt.ToString("F2")</span>
+                            <span>Time Step (dt)</span>
+                            <span class="control-value">@Sim.Dt.ToString("F3")</span>
                         </label>
-                        <input type="range" class="form-range" min="0.05" max="0.5" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
+                        <input type="range" class="form-range" min="0.01" max="0.2" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
                     </div>
                 </section>
 
@@ -104,10 +140,28 @@
                             <span>Weight</span>
                             <span class="control-value">@Context.ObstacleWeight.ToString("N0")</span>
                         </label>
-                        <input type="range" class="form-range" min="1000" max="50000" step="1000" @bind-value="Context.ObstacleWeight" @bind-value:event="oninput" />
+                        <input type="range" class="form-range" min="10000" max="100000" step="5000" @bind-value="Context.ObstacleWeight" @bind-value:event="oninput" />
                     </div>
                 </section>
             }
+
+            <section class="control-section">
+                <h3 class="section-title">Initial State</h3>
+                <div class="control-group">
+                    <label class="control-label">
+                        <span>Velocity</span>
+                        <span class="control-value">@InitialVelocity.ToString("F1")</span>
+                    </label>
+                    <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="InitialVelocity" @bind-value:event="oninput" />
+                </div>
+                <div class="control-group">
+                    <label class="control-label">
+                        <span>Angle</span>
+                        <span class="control-value">@InitialAngle.ToString("F2")</span>
+                    </label>
+                    <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="InitialAngle" @bind-value:event="oninput" />
+                </div>
+            </section>
 
             @if (_currentCar != null)
             {
@@ -143,7 +197,7 @@
 
     private Timer? _timer;
     private CarStateDTO? _currentCar;
-    private DotNetObjectReference<BasicVisualizer>? _objRef;
+    private DotNetObjectReference<ParkingVisualizer>? _objRef;
     private int _draggedIdx = -1;
 
     private double InitialVelocity { get; set; } = 0.0;
@@ -154,6 +208,7 @@
     protected override async Task OnInitializedAsync()
     {
         Sim.LoadScenario("parking");
+        Sim.Dt = 0.1;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -166,9 +221,20 @@
         }
     }
 
+    private void SetCarType(Enums.CarType type)
+    {
+        if (Context != null)
+        {
+            Context.CurrentCarType = type;
+        }
+    }
+
     private void Start()
     {
-        if (_timer != null) return;
+        if (_timer != null)
+        {
+            return;
+        }
         _timer = new Timer(100);
         _timer.Elapsed += async (s, e) => await Tick();
         _timer.Start();
@@ -212,6 +278,7 @@
             }
             catch
             {
+                
             }
 
             _mode = InteractionMode.None;
@@ -263,7 +330,10 @@
 
     private async Task ClearObstacles()
     {
-        if (Context != null) Context.Reset();
+        if (Context != null) 
+        {
+            Context.Reset();
+        }
         await Tick();
     }
 
@@ -278,13 +348,17 @@
 
         if (baseDto?.State != null)
         {
-            for (int i = 0; i < Math.Min(baseDto.State.Length, 4); i++)
+            for (int i = 0; i < Math.Min(baseDto.State.Length, 4); ++i)
+            {
                 car.State[i] = baseDto.State[i];
+            }
         }
         if (baseDto?.Control != null)
         {
-            for (int i = 0; i < Math.Min(baseDto.Control.Length, 2); i++)
+            for (int i = 0; i < Math.Min(baseDto.Control.Length, 2); ++i)
+            {
                 car.Control[i] = baseDto.Control[i];
+            }
         }
         return car;
     }
