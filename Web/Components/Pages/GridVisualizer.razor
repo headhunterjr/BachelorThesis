@@ -31,6 +31,10 @@
     </div>
 
     <div class="control-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">Controls</h2>
+        </div>
+
         <div class="panel-content">
             @if (Context != null)
             {
@@ -88,6 +92,44 @@
                     </div>
                 </section>
 
+                <section class="control-section">
+                    <h3 class="section-title">Grid Specs (Capacity)</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">Battery Size (kWh)</label>
+                        <input type="number" class="form-control" step="10"
+                               @bind-value="Context.BatteryCapacity" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Max Gen Power (kW)</label>
+                        <input type="number" class="form-control" step="5"
+                               @bind-value="Context.MaxGenPower" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Grid Limit (kW)</label>
+                        <input type="number" class="form-control" step="10"
+                               @bind-value="Context.MaxGridPower" @bind-value:event="oninput" />
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Economics & Tuning</h3>
+
+                    <div class="control-group">
+                        <label class="control-label">Fuel Cost ($/kWh)</label>
+                        <input type="number" class="form-control" step="0.05" min="0"
+                               @bind-value="Context.FuelCost" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Safety Strictness</label>
+                        <input type="number" class="form-control" step="100" min="100"
+                               @bind-value="Context.ConstraintWeight" @bind-value:event="oninput" />
+                    </div>
+                </section>
+
                 @if (_visuals != null)
                 {
                     <div class="telemetry-panel">
@@ -138,12 +180,22 @@
 
     private void ToggleSim()
     {
-        if (_isRunning) Stop(); else Start();
+        if (_isRunning) 
+        {
+            Stop(); 
+        }
+        else 
+        {
+            Start();
+        }
     }
 
     private void Start()
     {
-        if (_timer != null) return;
+        if (_timer != null) 
+        {
+            return;
+        }
 
         // Run faster than real time (200ms per "hour" step)
         _timer = new Timer(200);
