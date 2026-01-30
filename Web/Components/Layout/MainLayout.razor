@@ -1,9 +1,13 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager NavManager
 
-<div class="app-container">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<div class="app-container @(IsHome ? "home-mode" : "")">
+    @if (!IsHome)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
 
     <main class="main-content">
         @Body
@@ -15,3 +19,17 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool IsHome => NavManager.Uri == NavManager.BaseUri;
+
+    protected override void OnInitialized()
+    {
+        NavManager.LocationChanged += (s, e) => StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavManager.LocationChanged -= (s, e) => StateHasChanged();
+    }
+}
