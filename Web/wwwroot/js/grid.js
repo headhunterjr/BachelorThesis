@@ -134,11 +134,21 @@
 
     // LEGEND
     ctx.font = '12px Inter, sans-serif';
-    ctx.fillStyle = '#94A3B8';
 
     let lx = startX + 20;
-    ctx.fillStyle = '#10B981'; ctx.fillText("● Battery", lx, padding); lx += 70;
-    ctx.fillStyle = '#3B82F6'; ctx.fillText("● Grid", lx, padding); lx += 60;
-    ctx.fillStyle = '#F97316'; ctx.fillText("● Gen", lx, padding); lx += 60;
-    ctx.fillStyle = '#C084FC'; ctx.fillText("● Demand", lx, padding);
+    const spacing = 20; // Space between items
+
+    const legendItems = [
+        { text: "● Акумулятор", color: '#10B981' },
+        { text: "● Мережа", color: '#3B82F6' },
+        { text: "● Генератор", color: '#F97316' },
+        { text: "● Потреба", color: '#C084FC' }
+    ];
+
+    legendItems.forEach(item => {
+        ctx.fillStyle = item.color;
+        ctx.fillText(item.text, lx, padding);
+        // Move X by the exact width of the text plus spacing
+        lx += ctx.measureText(item.text).width + spacing;
+    });
 };

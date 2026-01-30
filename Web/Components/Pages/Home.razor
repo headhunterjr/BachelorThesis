@@ -1,38 +1,38 @@
 ﻿@page "/"
 @using Web.Components.Layout
-<PageTitle>MPC Lab</PageTitle>
+<PageTitle>Лабораторія MPC</PageTitle>
 
 <div class="home-wrapper">
     <div class="header-section">
-        <h1 class="main-title">MPC Lab</h1>
-        <p class="subtitle">Interactive Control Systems Visualizer</p>
+        <h1 class="main-title">Лабораторія MPC</h1>
+        <p class="subtitle">Інтерактивний візуалізатор MPC — методу керування динамічними системами</p>
     </div>
     <div class="cards-grid">
         <a href="parking" class="sim-card">
             <div class="card-icon parking-icon">
-                <VizIcon Name="CardParking" ViewBox="0 0 24 24" />
+                <SvgIcons Name="CardParking" ViewBox="0 0 24 24" />
             </div>
             <div class="card-content">
-                <h3>Parking</h3>
-                <p>Precise path planning with obstacle avoidance.</p>
+                <h3>Паркування</h3>
+                <p>Точне планування шляху до заданої точки з урахуванням перешкод.</p>
             </div>
         </a>
         <a href="racing" class="sim-card">
             <div class="card-icon racing-icon">
-                <VizIcon Name="CardRacing" ViewBox="0 0 24 24" />
+                <SvgIcons Name="CardRacing" ViewBox="0 0 24 24" />
             </div>
             <div class="card-content">
-                <h3>Racing</h3>
-                <p>High-speed trajectory tracking and dynamic control.</p>
+                <h3>Перегони</h3>
+                <p>Планування шляху автомобіля уздовж замкнутого гоночного треку.</p>
             </div>
         </a>
         <a href="grid" class="sim-card">
             <div class="card-icon grid-icon">
-                <VizIcon Name="CardGrid" ViewBox="0 0 24 24" />
+                <SvgIcons Name="CardGrid" ViewBox="0 0 24 24" />
             </div>
             <div class="card-content">
-                <h3>Smart Grid</h3>
-                <p>Energy management optimization over 24h horizon.</p>
+                <h3>Електромережа</h3>
+                <p>Оптимізація використання електроенергії впродовж 24 годин.</p>
             </div>
         </a>
     </div>

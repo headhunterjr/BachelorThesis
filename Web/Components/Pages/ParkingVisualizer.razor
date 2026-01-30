@@ -8,12 +8,12 @@
 @using Web.Services.Scenarios
 @implements IDisposable
 
-<PageTitle>Parking - MPC Lab</PageTitle>
+<PageTitle>Паркування - Лабораторія MPC</PageTitle>
 
 <div class="visualizer-container">
     <div class="simulation-area">
         <div class="simulation-header">
-            <h1 class="simulation-title">Parking</h1>
+            <h1 class="simulation-title">Паркування</h1>
         </div>
 
         <div class="canvas-wrapper">
@@ -22,94 +22,94 @@
 
         <div class="control-buttons">
             <div class="button-group">
-                <button class="btn btn-success" @onclick="Start">Start</button>
-                <button class="btn btn-danger" @onclick="Stop">Stop</button>
-                <button class="btn btn-secondary" @onclick="Reset">Reset</button>
+                <button class="btn btn-success" @onclick="Start">Старт</button>
+                <button class="btn btn-danger" @onclick="Stop">Стоп</button>
+                <button class="btn btn-secondary" @onclick="Reset">Скинути</button>
             </div>
 
             <div class="button-group">
                 <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-info")" @onclick="SetAddObstacleMode">
-                    @(_mode == InteractionMode.AddObstacle ? "Cancel" : "Add Obstacle")
+                    @(_mode == InteractionMode.AddObstacle ? "Скасувати" : "Додати перешкоду")
                 </button>
                 <button class="btn @(_mode == InteractionMode.SetStart ? "btn-warning" : "btn-primary")" @onclick="SetStartPositionMode">
-                    @(_mode == InteractionMode.SetStart ? "Cancel" : "Move Car")
+                    @(_mode == InteractionMode.SetStart ? "Скасувати" : "Перемістити авто")
                 </button>
             </div>
 
-            <button class="btn btn-outline-danger" @onclick="ClearObstacles">Clear All</button>
+            <button class="btn btn-outline-danger" @onclick="ClearObstacles">Очистити все</button>
         </div>
     </div>
 
     <div class="control-panel">
         <div class="panel-header">
-            <h2 class="panel-title">Controls</h2>
+            <h2 class="panel-title">Керування</h2>
         </div>
 
         <div class="panel-content">
             @if (Context != null)
             {
                 <section class="control-section">
-                    <h3 class="section-title">Car Type</h3>
+                    <h3 class="section-title">Тип автомобіля</h3>
                     <div class="btn-group" style="width: 100%; margin-bottom: 1rem;">
                         <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.GoKart ? "btn-primary" : "btn-secondary")"
                                 @onclick='() => SetCarType(Enums.CarType.GoKart)' style="flex: 1;">
-                            Kart
+                            Карт
                         </button>
                         <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Sedan ? "btn-primary" : "btn-secondary")"
                                 @onclick='() => SetCarType(Enums.CarType.Sedan)' style="flex: 1;">
-                            Sedan
+                            Седан
                         </button>
                         <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Limo ? "btn-primary" : "btn-secondary")"
                                 @onclick='() => SetCarType(Enums.CarType.Limo)' style="flex: 1;">
-                            Limo
+                            Вантажний
                         </button>
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Solver Tuning (Precision)</h3>
+                    <h3 class="section-title">Налаштування точності</h3>
 
                     <div class="control-group">
-                        <label class="control-label">Position (X/Y)</label>
+                        <label class="control-label">Позиція (X/Y)</label>
                         <input type="number" class="form-control" step="1"
                                @bind-value="Context.PrecisionPosition" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Velocity</label>
+                        <label class="control-label">Швидкість</label>
                         <input type="number" class="form-control" step="10"
                                @bind-value="Context.PrecisionVelocity" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Angle</label>
+                        <label class="control-label">Кут</label>
                         <input type="number" class="form-control" step="0.1"
                                @bind-value="Context.PrecisionAngle" @bind-value:event="oninput" />
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Driving Style (Smoothness)</h3>
+                    <h3 class="section-title">Плавність</h3>
 
                     <div class="control-group">
-                        <label class="control-label">Acceleration</label>
+                        <label class="control-label">Прискорення</label>
                         <input type="number" class="form-control" step="0.1"
                                @bind-value="Context.SmoothnessAccel" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Steering</label>
+                        <label class="control-label">Кермування</label>
                         <input type="number" class="form-control" step="100"
                                @bind-value="Context.SmoothnessSteering" @bind-value:event="oninput" />
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Simulation</h3>
+                    <h3 class="section-title">Симуляція</h3>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Horizon</span>
+                            <span>Горизонт</span>
                             <span class="control-value">@Context.Horizon</span>
                         </label>
                         <input type="range" class="form-range" min="10" max="100" step="1" @bind-value="Context.Horizon" @bind-value:event="oninput" />
@@ -117,7 +117,7 @@
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Time Step (dt)</span>
+                            <span>Крок часу (dt)</span>
                             <span class="control-value">@Sim.Dt.ToString("F3")</span>
                         </label>
                         <input type="range" class="form-range" min="0.01" max="0.2" step="0.01" @bind-value="Sim.Dt" @bind-value:event="oninput" />
@@ -125,11 +125,11 @@
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Obstacles</h3>
+                    <h3 class="section-title">Перешкоди</h3>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Radius</span>
+                            <span>Радіус</span>
                             <span class="control-value">@Context.ObstacleRadius.ToString("F1")</span>
                         </label>
                         <input type="range" class="form-range" min="1" max="15" step="0.5" @bind-value="Context.ObstacleRadius" @bind-value:event="oninput" />
@@ -137,7 +137,7 @@
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Weight</span>
+                            <span>Вага</span>
                             <span class="control-value">@Context.ObstacleWeight.ToString("N0")</span>
                         </label>
                         <input type="range" class="form-range" min="10000" max="100000" step="5000" @bind-value="Context.ObstacleWeight" @bind-value:event="oninput" />
@@ -146,17 +146,17 @@
             }
 
             <section class="control-section">
-                <h3 class="section-title">Initial State</h3>
+                <h3 class="section-title">Початковий стан</h3>
                 <div class="control-group">
                     <label class="control-label">
-                        <span>Velocity</span>
+                        <span>Швидкість</span>
                         <span class="control-value">@InitialVelocity.ToString("F1")</span>
                     </label>
                     <input type="range" class="form-range" min="0" max="20" step="0.5" @bind-value="InitialVelocity" @bind-value:event="oninput" />
                 </div>
                 <div class="control-group">
                     <label class="control-label">
-                        <span>Angle</span>
+                        <span>Кут</span>
                         <span class="control-value">@InitialAngle.ToString("F2")</span>
                     </label>
                     <input type="range" class="form-range" min="-3.14" max="3.14" step="0.01" @bind-value="InitialAngle" @bind-value:event="oninput" />
@@ -166,7 +166,7 @@
             @if (_currentCar != null)
             {
                 <div class="telemetry-panel">
-                    <h3 class="telemetry-title">Telemetry</h3>
+                    <h3 class="telemetry-title">Телеметрія</h3>
                     <div class="telemetry-grid">
                         <div class="telemetry-item">
                             <div class="telemetry-label">X</div>
@@ -177,11 +177,11 @@
                             <div class="telemetry-value">@(_currentCar.Y.ToString("F2"))</div>
                         </div>
                         <div class="telemetry-item">
-                            <div class="telemetry-label">Velocity</div>
+                            <div class="telemetry-label">Швидкість</div>
                             <div class="telemetry-value">@(Math.Abs(_currentCar.Velocity).ToString("F2"))</div>
                         </div>
                         <div class="telemetry-item">
-                            <div class="telemetry-label">Angle</div>
+                            <div class="telemetry-label">Кут</div>
                             <div class="telemetry-value">@(_currentCar.Theta.ToString("F2"))</div>
                         </div>
                     </div>

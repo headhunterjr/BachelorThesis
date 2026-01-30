@@ -7,12 +7,12 @@
 @using Web.Services.Scenarios
 @implements IDisposable
 
-<PageTitle>Smart Grid - MPC Lab</PageTitle>
+<PageTitle>Розумна мережа - Лабораторія MPC</PageTitle>
 
 <div class="visualizer-container">
     <div class="simulation-area">
         <div class="simulation-header">
-            <h1 class="simulation-title">Smart Grid Optimization</h1>
+            <h1 class="simulation-title">Оптимізація використання електроенергії</h1>
         </div>
 
         <div class="canvas-wrapper">
@@ -22,109 +22,109 @@
         <div class="control-buttons">
             <div class="button-group">
                 <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
-                    @(_isRunning ? "Stop" : "Start Day")
+                    @(_isRunning ? "Стоп" : "Почати день")
                 </button>
-                <button class="btn btn-primary" @onclick="RunSingleStep">Step (+1 Hr)</button>
-                <button class="btn btn-secondary" @onclick="Reset">Reset</button>
+                <button class="btn btn-primary" @onclick="RunSingleStep">Крок (+1 год)</button>
+                <button class="btn btn-secondary" @onclick="Reset">Скинути</button>
             </div>
         </div>
     </div>
 
     <div class="control-panel">
         <div class="panel-header">
-            <h2 class="panel-title">Controls</h2>
+            <h2 class="panel-title">Керування</h2>
         </div>
 
         <div class="panel-content">
             @if (Context != null)
             {
                 <section class="control-section">
-                    <h3 class="section-title">Environment</h3>
+                    <h3 class="section-title">Середовище</h3>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Season</span>
-                            <span class="control-value">@Context.Season</span>
+                            <span>Пора року</span>
+                            <span class="control-value">@(Context.Season == "Summer" ? "Літо" : "Зима")</span>
                         </label>
                         <button class="btn btn-sm @(Context.Season == "Summer" ? "btn-warning" : "btn-info")"
                                 style="width: 100%"
                                 @onclick='() => ToggleConfig("NextSeason")'>
-                            Toggle Season
+                            Змінити пору року
                         </button>
                     </div>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Grid Status</span>
+                            <span>Статус мережі</span>
                             <span class="control-value" style="color: @(Context.IsBlackout ? "#EF4444" : "#10B981")">
-                                @(Context.IsBlackout ? "BLACKOUT" : "ONLINE")
+                                @(Context.IsBlackout ? "Блекаут" : "Онлайн")
                             </span>
                         </label>
                         <button class="btn btn-sm btn-outline-danger"
                                 style="width: 100%"
                                 @onclick='() => ToggleConfig("ToggleBlackout")'>
-                            Simulate Blackout
+                            Симулювати блекаут
                         </button>
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Infrastructure</h3>
+                    <h3 class="section-title">Інфраструктура</h3>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Solar Array</span>
-                            <span class="control-value">@(Context.HasSolar ? "Installed" : "None")</span>
+                            <span>Сонячні панелі</span>
+                            <span class="control-value">@(Context.HasSolar ? "Готові" : "Не готові")</span>
                         </label>
                         <button class="btn btn-sm btn-secondary" style="width: 100%" @onclick='() => ToggleConfig("ToggleSolar")'>
-                            Toggle Solar
+                            @(Context.HasSolar ? "Вимкнути панелі" : "Увімкнути панелі")
                         </button>
                     </div>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Diesel Gen</span>
-                            <span class="control-value">@(Context.HasGenerator ? "Ready" : "Disabled")</span>
+                            <span>Дизель-генератор</span>
+                            <span class="control-value">@(Context.HasGenerator ? "Готовий" : "Не готовий")</span>
                         </label>
                         <button class="btn btn-sm btn-secondary" style="width: 100%" @onclick='() => ToggleConfig("ToggleGen")'>
-                            Toggle Generator
+                            @(Context.HasGenerator ? "Вимкнути генератор" : "Увімкнути генератор")
                         </button>
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Grid Specs (Capacity)</h3>
+                    <h3 class="section-title">Характеристики мережі</h3>
 
                     <div class="control-group">
-                        <label class="control-label">Battery Size (kWh)</label>
+                        <label class="control-label">Ємність акумулятора (кВт·год)</label>
                         <input type="number" class="form-control" step="10"
                                @bind-value="Context.BatteryCapacity" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Max Gen Power (kW)</label>
+                        <label class="control-label">Макс. потужність генератора (кВт)</label>
                         <input type="number" class="form-control" step="5"
                                @bind-value="Context.MaxGenPower" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Grid Limit (kW)</label>
+                        <label class="control-label">Ліміт мережі (кВт)</label>
                         <input type="number" class="form-control" step="10"
                                @bind-value="Context.MaxGridPower" @bind-value:event="oninput" />
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Economics & Tuning</h3>
+                    <h3 class="section-title">Економіка та налаштування</h3>
 
                     <div class="control-group">
-                        <label class="control-label">Fuel Cost ($/kWh)</label>
+                        <label class="control-label">Вартість пального ($/кВт·год)</label>
                         <input type="number" class="form-control" step="0.05" min="0"
                                @bind-value="Context.FuelCost" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Safety Strictness</label>
+                        <label class="control-label">Жорсткість обмежень</label>
                         <input type="number" class="form-control" step="100" min="100"
                                @bind-value="Context.ConstraintWeight" @bind-value:event="oninput" />
                     </div>
@@ -133,18 +133,18 @@
                 @if (_visuals != null)
                 {
                     <div class="telemetry-panel">
-                        <h3 class="telemetry-title">Forecast Results</h3>
+                        <h3 class="telemetry-title">Результати прогнозу</h3>
                         <div class="telemetry-grid">
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Time</div>
-                                <div class="telemetry-value">@((_visuals.CurrentStep / 2.0).ToString("F1")) h</div>
+                                <div class="telemetry-label">Час</div>
+                                <div class="telemetry-value">@((_visuals.CurrentStep / 2.0).ToString("F1")) год</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Battery</div>
-                                <div class="telemetry-value">@(_visuals.PlannedBattery[_visuals.CurrentStep > 0 ? _visuals.CurrentStep - 1 : 0].ToString("F1")) kWh</div>
+                                <div class="telemetry-label">Акумулятор</div>
+                                <div class="telemetry-value">@(_visuals.PlannedBattery[_visuals.CurrentStep > 0 ? _visuals.CurrentStep - 1 : 0].ToString("F1")) кВт·год</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Acc. Cost</div>
+                                <div class="telemetry-label">Вартість</div>
                                 <div class="telemetry-value" style="grid-column: span 2;">$@(_visuals.CurrentCost.ToString("F2"))</div>
                             </div>
                         </div>
@@ -180,11 +180,11 @@
 
     private void ToggleSim()
     {
-        if (_isRunning) 
+        if (_isRunning)
         {
-            Stop(); 
+            Stop();
         }
-        else 
+        else
         {
             Start();
         }
@@ -192,7 +192,7 @@
 
     private void Start()
     {
-        if (_timer != null) 
+        if (_timer != null)
         {
             return;
         }
