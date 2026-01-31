@@ -1,15 +1,15 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager NavManager
 
-<div class="app-container @(IsHome ? "home-mode" : "")">
+<div class="app-layout">
     @if (!IsHome)
     {
-        <div class="sidebar">
+        <header class="top-bar">
             <NavMenu />
-        </div>
+        </header>
     }
 
-    <main class="main-content">
+    <main class="page-content">
         @Body
     </main>
 </div>

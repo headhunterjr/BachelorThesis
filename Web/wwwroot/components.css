@@ -73,17 +73,17 @@
     height: 40px; /* Consistent button height */
 }
 
-.nav-item:hover {
-    color: var(--text);
-    background: rgba(124, 58, 237, 0.1);
-}
+    .nav-item:hover {
+        color: var(--text);
+        background: rgba(124, 58, 237, 0.1);
+    }
 
-.nav-item.active {
-    color: var(--text);
-    background: var(--primary); /* Solid background for active tab */
-    color: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+    .nav-item.active {
+        color: var(--text);
+        background: var(--primary); /* Solid background for active tab */
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 
 .nav-icon {
     width: 18px;
@@ -93,7 +93,7 @@
 /* --- RIGHT SIDEBAR (Control Panel) --- */
 /* WIDENED to 320px per request */
 .control-panel {
-    width: 320px; 
+    width: 320px;
     min-width: 320px;
     background: var(--surface);
     border-left: 1px solid var(--border);
@@ -140,7 +140,9 @@
     overflow: hidden;
 }
 
-.simulation-header { flex-shrink: 0; }
+.simulation-header {
+    flex-shrink: 0;
+}
 
 .simulation-title {
     font-size: 1.5rem;
@@ -168,8 +170,13 @@
 }
 
 /* --- CONTROLS STYLING --- */
-.control-section { margin-bottom: 1.5rem; }
-.control-section:last-of-type { margin-bottom: 0; }
+.control-section {
+    margin-bottom: 1.5rem;
+}
+
+    .control-section:last-of-type {
+        margin-bottom: 0;
+    }
 
 .section-title {
     font-size: 0.8rem;
@@ -180,7 +187,9 @@
     letter-spacing: 0.05em;
 }
 
-.control-group { margin-bottom: 1rem; }
+.control-group {
+    margin-bottom: 1rem;
+}
 
 .control-label {
     display: flex;
@@ -211,9 +220,17 @@
     gap: 0.5rem;
 }
 
-.button-group:first-child { justify-self: start; }
-.button-group:nth-child(2) { justify-self: center; }
-.btn-outline-danger { justify-self: end; }
+    .button-group:first-child {
+        justify-self: start;
+    }
+
+    .button-group:nth-child(2) {
+        justify-self: center;
+    }
+
+.btn-outline-danger {
+    justify-self: end;
+}
 
 /* --- HOME PAGE --- */
 .home-wrapper {
@@ -269,20 +286,28 @@
     backdrop-filter: blur(10px);
 }
 
-.sim-card:hover {
-    transform: translateY(-8px);
-    border-color: var(--primary);
-    background: rgba(30, 41, 59, 0.9);
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
-}
+    .sim-card:hover {
+        transform: translateY(-8px);
+        border-color: var(--primary);
+        background: rgba(30, 41, 59, 0.9);
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+    }
 
 .card-icon {
     margin-bottom: 1.5rem;
 }
 
-.parking-icon { color: var(--primary); }
-.racing-icon { color: var(--secondary); }
-.grid-icon { color: #F59E0B; }
+.parking-icon {
+    color: var(--primary);
+}
+
+.racing-icon {
+    color: var(--secondary);
+}
+
+.grid-icon {
+    color: #F59E0B;
+}
 
 .card-icon svg {
     width: 64px;
@@ -357,7 +382,7 @@
 
     .simulation-area {
         height: 60vh; /* Canvas takes 60% height */
-        flex: none; 
+        flex: none;
     }
 
     .control-panel {
@@ -365,7 +390,7 @@
         height: auto;
         border-left: none;
         border-top: 1px solid var(--border);
-        overflow-y: visible; 
+        overflow-y: visible;
     }
 }
 
@@ -373,22 +398,24 @@
     .nav-container {
         padding: 0 1rem;
     }
-    
+
     .nav-links-wrapper {
         gap: 0;
     }
-    
+
     .nav-item {
         padding: 0.5rem;
         font-size: 0.8rem;
     }
-    
-    .nav-item span {
-        display: none; /* Hide text on mobile nav, icons only */
+
+        .nav-item span {
+            display: none; /* Hide text on mobile nav, icons only */
+        }
+
+    .main-title {
+        font-size: 2.5rem;
     }
 
-    .main-title { font-size: 2.5rem; }
-    
     .control-buttons {
         grid-template-columns: 1fr;
         gap: 1rem;
