@@ -7,7 +7,7 @@
 @using Web.Services.Scenarios
 @implements IDisposable
 
-<PageTitle>Розумна мережа - Лабораторія MPC</PageTitle>
+<PageTitle>Електромережа - Лабораторія MPC</PageTitle>
 
 <div class="visualizer-container">
     <div class="simulation-area">
@@ -256,6 +256,12 @@
         StateHasChanged();
     }
 
+    [JSInvokable]
+    public async Task Redraw()
+    {
+        await UpdateVisuals();
+    }
+
     // Required by common.js
     [JSInvokable] public void HandleMouseDown(double x, double y) { }
     [JSInvokable] public void HandleMouseMove(double x, double y) { }
@@ -265,6 +271,7 @@
     public void Dispose()
     {
         Stop();
+        try { ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "gridCanvas"); } catch { }
         _objRef?.Dispose();
     }
 }

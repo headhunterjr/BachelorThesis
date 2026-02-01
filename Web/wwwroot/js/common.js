@@ -2,66 +2,81 @@
     scale: 4.5
 };
 
-window.initCanvasEvents = (canvasId, dotNetHelper) => {
+window.initCanvasEvents = (canvasId, dotNetRef) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    // Size the canvas to fill its container
-    const resizeCanvas = () => {
-        const wrapper = canvas.parentElement;
-        const rect = wrapper.getBoundingClientRect();
+    // --- NEW: Resize Handler ---
+    const resizeHandler = () => {
+        // 1. Resize internal memory to match CSS display size
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+        
+        if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+            canvas.width = displayWidth;
+            canvas.height = displayHeight;
+        }
 
-        // Account for wrapper padding (1.5rem = 24px on each side)
-        const availableWidth = rect.width - 48;
-        const availableHeight = rect.height - 48;
-
-        // Make canvas fill the available space
-        canvas.width = availableWidth;
-        canvas.height = availableHeight;
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    const scale = window.gameCanvas.scale;
-
-    const toMeters = (clientX, clientY) => {
-        const rect = canvas.getBoundingClientRect();
-        const canvasCenterX = canvas.width / 2;
-        const canvasCenterY = canvas.height / 2;
-
-        // Get mouse position relative to canvas
-        const canvasX = clientX - rect.left;
-        const canvasY = clientY - rect.top;
-
-        // Convert to world coordinates (meters)
-        const x = (canvasX - canvasCenterX) / scale;
-        const y = -(canvasY - canvasCenterY) / scale;
-
-        return { x, y };
-    };
-
-    canvas.onmousedown = (e) => {
-        const c = toMeters(e.clientX, e.clientY);
-        if (e.button === 2) {
-            dotNetHelper.invokeMethodAsync('HandleRightClick', c.x, c.y);
-        } else {
-            dotNetHelper.invokeMethodAsync('HandleMouseDown', c.x, c.y);
+        // 2. Ask C# to redraw immediately so the canvas isn't blank
+        try {
+            dotNetRef.invokeMethodAsync('Redraw');
+        } catch (e) {
+            // Ignored: Component might be disposed
         }
     };
 
+    // Debounce resize to prevent lag
+    let resizeTimeout;
+    const onResize = () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(resizeHandler, 20); // 20ms delay
+    };
+
+    window.addEventListener('resize', onResize);
+    // Store cleanup function for later
+    canvas._cleanupResize = () => window.removeEventListener('resize', onResize);
+
+    // --- Existing Mouse Handling (Keep your existing mouse logic here!) ---
+    // Make sure to add the mouse event listeners here as before...
+    canvas.onmousedown = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scale = window.gameCanvas?.scale || 20;
+        const simX = (e.clientX - rect.left - canvas.width/2) / scale;
+        const simY = -(e.clientY - rect.top - canvas.height/2) / scale;
+        dotNetRef.invokeMethodAsync('HandleMouseDown', simX, simY);
+    };
+    
     canvas.onmousemove = (e) => {
-        const c = toMeters(e.clientX, e.clientY);
-        dotNetHelper.invokeMethodAsync('HandleMouseMove', c.x, c.y);
+        const rect = canvas.getBoundingClientRect();
+        const scale = window.gameCanvas?.scale || 20;
+        const simX = (e.clientX - rect.left - canvas.width/2) / scale;
+        const simY = -(e.clientY - rect.top - canvas.height/2) / scale;
+        dotNetRef.invokeMethodAsync('HandleMouseMove', simX, simY);
     };
 
-    canvas.onmouseup = () => {
-        dotNetHelper.invokeMethodAsync('HandleMouseUp');
-    };
-
+    canvas.onmouseup = () => dotNetRef.invokeMethodAsync('HandleMouseUp');
+    
     canvas.oncontextmenu = (e) => {
         e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const scale = window.gameCanvas?.scale || 20;
+        const simX = (e.clientX - rect.left - canvas.width/2) / scale;
+        const simY = -(e.clientY - rect.top - canvas.height/2) / scale;
+        dotNetRef.invokeMethodAsync('HandleRightClick', simX, simY);
+        return false;
     };
+};
+
+// --- NEW: Cleanup Function ---
+window.disposeCanvasEvents = (canvasId) => {
+    const canvas = document.getElementById(canvasId);
+    if (canvas) {
+        if (canvas._cleanupResize) canvas._cleanupResize();
+        canvas.onmousedown = null;
+        canvas.onmousemove = null;
+        canvas.onmouseup = null;
+        canvas.oncontextmenu = null;
+    }
 };
 
 window.drawCar = (ctx, car, toScreenX, toScreenY) => {
@@ -88,7 +103,18 @@ window.drawCar = (ctx, car, toScreenX, toScreenY) => {
 
 window.clearCanvas = (canvasId) => {
     const canvas = document.getElementById(canvasId);
+    if (!canvas) return { canvas: null, ctx: null };
+
+    const displayWidth = canvas.clientWidth;
+    const displayHeight = canvas.clientHeight;
+
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+    }
+
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     return { canvas, ctx };
 };

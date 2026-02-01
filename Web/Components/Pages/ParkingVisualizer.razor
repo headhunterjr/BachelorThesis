@@ -57,7 +57,7 @@
                         </button>
                         <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Sedan ? "btn-primary" : "btn-secondary")"
                                 @onclick='() => SetCarType(Enums.CarType.Sedan)' style="flex: 1;">
-                            Седан
+                            Легковий
                         </button>
                         <button class="btn btn-sm @(Context.CurrentCarType == Enums.CarType.Limo ? "btn-primary" : "btn-secondary")"
                                 @onclick='() => SetCarType(Enums.CarType.Limo)' style="flex: 1;">
@@ -260,6 +260,12 @@
     }
 
     [JSInvokable]
+    public async Task Redraw()
+    {
+        await Tick();
+    }
+
+    [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
         if (_mode == InteractionMode.AddObstacle)
@@ -363,5 +369,10 @@
         return car;
     }
 
-    public void Dispose() { _timer?.Dispose(); _objRef?.Dispose(); }
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        try { ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "simCanvas"); } catch { }
+        _objRef?.Dispose();
+    }
 }
