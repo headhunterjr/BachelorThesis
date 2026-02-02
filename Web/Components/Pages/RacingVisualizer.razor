@@ -27,16 +27,14 @@
                 <button class="btn btn-secondary" @onclick="ClearTrail">Очистити шлях</button>
             </div>
 
-            <div class="button-group" style="justify-self: center;">
-                @if (_trackExists)
-                {
-                    <span class="badge bg-success">Шлях готовий</span>
-                }
-                else
-                {
-                    <span class="badge bg-info">Намалюйте замкнутий шлях</span>
-                }
-            </div>
+            @if (_trackExists)
+            {
+                <span class="track-status ready">Шлях готовий</span>
+            }
+            else
+            {
+                <span class="track-status waiting">Намалюйте замкнутий шлях</span>
+            }
 
             <button class="btn btn-outline-danger" @onclick="ResetTrack">Скинути</button>
         </div>

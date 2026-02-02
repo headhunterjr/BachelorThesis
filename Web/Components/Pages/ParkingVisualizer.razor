@@ -22,21 +22,30 @@
 
         <div class="control-buttons">
             <div class="button-group">
-                <button class="btn btn-success" @onclick="Start">Старт</button>
-                <button class="btn btn-danger" @onclick="Stop">Стоп</button>
+                <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
+                    @(_isRunning ? "Стоп" : "Старт")
+                </button>
                 <button class="btn btn-secondary" @onclick="Reset">Скинути</button>
             </div>
 
-            <div class="button-group">
-                <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-info")" @onclick="SetAddObstacleMode">
-                    @(_mode == InteractionMode.AddObstacle ? "Скасувати" : "Додати перешкоду")
+            <div class="button-group-center">
+                <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-outline-warning")"
+                        @onclick="ToggleAddObstacle">
+                    @(_mode == InteractionMode.AddObstacle ? "Завершити" : "Додати перешкоду")
                 </button>
-                <button class="btn @(_mode == InteractionMode.SetStart ? "btn-warning" : "btn-primary")" @onclick="SetStartPositionMode">
+
+                <button class="btn @(_mode == InteractionMode.SetStart ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="ToggleSetStart">
                     @(_mode == InteractionMode.SetStart ? "Скасувати" : "Перемістити авто")
+                </button>
+
+                <button class="btn @(_mode == InteractionMode.SetTarget ? "btn-success" : "btn-outline-success")"
+                        @onclick="ToggleSetTarget">
+                    @(_mode == InteractionMode.SetTarget ? "Скасувати" : "Встановити ціль")
                 </button>
             </div>
 
-            <button class="btn btn-outline-danger" @onclick="ClearObstacles">Очистити все</button>
+            <button class="btn btn-outline-danger" @onclick="Reset">Скинути все</button>
         </div>
     </div>
 
@@ -192,8 +201,9 @@
 </div>
 
 @code {
-    private enum InteractionMode { None, AddObstacle, SetStart }
+    private enum InteractionMode { None, AddObstacle, SetStart, SetTarget }
     private InteractionMode _mode = InteractionMode.None;
+    private bool _isRunning = false;
 
     private Timer? _timer;
     private CarStateDTO? _currentCar;
@@ -229,6 +239,28 @@
         }
     }
 
+    private void ToggleAddObstacle()
+    {
+        _mode = (_mode == InteractionMode.AddObstacle) ? InteractionMode.None : InteractionMode.AddObstacle;
+    }
+
+    private void ToggleSetStart()
+    {
+        _mode = (_mode == InteractionMode.SetStart) ? InteractionMode.None : InteractionMode.SetStart;
+    }
+
+    private async Task ToggleSetTarget()
+    {
+        bool enabling = (_mode != InteractionMode.SetTarget);
+        _mode = enabling ? InteractionMode.SetTarget : InteractionMode.None;
+        await JS.InvokeVoidAsync("setCanvasSetTargetMode", "simCanvas", enabling);
+    }
+
+    private void ToggleSim()
+    {
+        if (_isRunning) Stop(); else Start();
+    }
+
     private void Start()
     {
         if (_timer != null)
@@ -238,6 +270,14 @@
         _timer = new Timer(100);
         _timer.Elapsed += async (s, e) => await Tick();
         _timer.Start();
+        _isRunning = true;
+    }
+
+    private void Stop()
+    {
+        _timer?.Stop();
+        _timer = null;
+        _isRunning = false;
     }
 
     private async Task Tick()
@@ -255,13 +295,20 @@
         _currentCar = MapBaseToCar(baseDto);
 
         var obstacles = Sim.GetCurrentVisuals();
-        await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
+        // Cast to object to fix dynamic dispatch issue
+        await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, (object)obstacles);
         await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
     public async Task Redraw()
     {
+        // Auto-disable SetTarget button when JS reports action complete
+        if (_mode == InteractionMode.SetTarget)
+        {
+            _mode = InteractionMode.None;
+            StateHasChanged();
+        }
         await Tick();
     }
 
@@ -271,7 +318,7 @@
         if (_mode == InteractionMode.AddObstacle)
         {
             Sim.HandleInteraction(x, y, "AddObstacle");
-            _mode = InteractionMode.None;
+            // Do NOT reset mode here, allowing persistent add.
             await Tick();
             return;
         }
@@ -284,13 +331,15 @@
             }
             catch
             {
-                
+
             }
 
             _mode = InteractionMode.None;
             await Tick();
             return;
         }
+
+        // SetTarget is handled via JS origins + Redraw callback
 
         if (Context != null)
         {
@@ -331,20 +380,15 @@
     [JSInvokable]
     public void HandleMouseUp() => _draggedIdx = -1;
 
-    private void SetAddObstacleMode() => _mode = (_mode == InteractionMode.AddObstacle) ? InteractionMode.None : InteractionMode.AddObstacle;
-    private void SetStartPositionMode() => _mode = (_mode == InteractionMode.SetStart) ? InteractionMode.None : InteractionMode.SetStart;
-
-    private async Task ClearObstacles()
+    private void Reset()
     {
-        if (Context != null) 
-        {
-            Context.Reset();
-        }
-        await Tick();
+        Stop();
+        Sim.Reset();
+        _currentCar = null;
+        // Reset JS view origin via JS call logic if needed
+        JS.InvokeVoidAsync("setCanvasSetTargetMode", "simCanvas", false);
+        _ = Tick();
     }
-
-    private void Stop() { _timer?.Stop(); _timer = null; }
-    private void Reset() { Stop(); Sim.Reset(); _currentCar = null; _ = Tick(); }
 
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
     {
@@ -366,6 +410,16 @@
                 car.Control[i] = baseDto.Control[i];
             }
         }
+
+        // Ensuring telemetry has data even if State array is short
+        if (car.State.Length >= 4)
+        {
+            car.X = car.State[0];
+            car.Y = car.State[1];
+            car.Velocity = car.State[2];
+            car.Theta = car.State[3];
+        }
+
         return car;
     }
 

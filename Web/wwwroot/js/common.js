@@ -1,73 +1,92 @@
 ﻿window.gameCanvas = {
-    scale: 4.5
+    scale: 4.5,
+    origins: {},
+    setTargetMode: {}
 };
 
 window.initCanvasEvents = (canvasId, dotNetRef) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    // --- NEW: Resize Handler ---
-    const resizeHandler = () => {
-        // 1. Resize internal memory to match CSS display size
+    const ensureSizeAndOrigin = () => {
         const displayWidth = canvas.clientWidth;
         const displayHeight = canvas.clientHeight;
-        
         if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
             canvas.width = displayWidth;
             canvas.height = displayHeight;
         }
-
-        // 2. Ask C# to redraw immediately so the canvas isn't blank
-        try {
-            dotNetRef.invokeMethodAsync('Redraw');
-        } catch (e) {
-            // Ignored: Component might be disposed
+        if (!window.gameCanvas.origins[canvasId]) {
+            window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
         }
     };
 
-    // Debounce resize to prevent lag
+    ensureSizeAndOrigin();
+
     let resizeTimeout;
     const onResize = () => {
         clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(resizeHandler, 20); // 20ms delay
+        resizeTimeout = setTimeout(() => {
+            ensureSizeAndOrigin();
+            try { dotNetRef.invokeMethodAsync('Redraw'); } catch (e) { }
+        }, 20);
     };
-
     window.addEventListener('resize', onResize);
-    // Store cleanup function for later
+
     canvas._cleanupResize = () => window.removeEventListener('resize', onResize);
 
-    // --- Existing Mouse Handling (Keep your existing mouse logic here!) ---
-    // Make sure to add the mouse event listeners here as before...
-    canvas.onmousedown = (e) => {
+    const scale = window.gameCanvas.scale;
+
+    const toWorld = (clientX, clientY) => {
         const rect = canvas.getBoundingClientRect();
-        const scale = window.gameCanvas?.scale || 20;
-        const simX = (e.clientX - rect.left - canvas.width/2) / scale;
-        const simY = -(e.clientY - rect.top - canvas.height/2) / scale;
-        dotNetRef.invokeMethodAsync('HandleMouseDown', simX, simY);
-    };
-    
-    canvas.onmousemove = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const scale = window.gameCanvas?.scale || 20;
-        const simX = (e.clientX - rect.left - canvas.width/2) / scale;
-        const simY = -(e.clientY - rect.top - canvas.height/2) / scale;
-        dotNetRef.invokeMethodAsync('HandleMouseMove', simX, simY);
+        const origin = window.gameCanvas.origins[canvasId] || { x: canvas.width / 2, y: canvas.height / 2 };
+        const canvasX = clientX - rect.left;
+        const canvasY = clientY - rect.top;
+        const wx = (canvasX - origin.x) / scale;
+        const wy = -(canvasY - origin.y) / scale;
+        return { worldX: wx, worldY: wy, canvasX, canvasY };
     };
 
-    canvas.onmouseup = () => dotNetRef.invokeMethodAsync('HandleMouseUp');
-    
+    canvas.onmousedown = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const { worldX, worldY, canvasX, canvasY } = toWorld(e.clientX, e.clientY);
+
+        if (window.gameCanvas.setTargetMode[canvasId]) {
+            window.gameCanvas.origins[canvasId] = { x: canvasX, y: canvasY };
+            window.gameCanvas.setTargetMode[canvasId] = false;
+            try { dotNetRef.invokeMethodAsync('Redraw'); } catch (e) { }
+            return;
+        }
+
+        if (e.button === 2) {
+            dotNetRef.invokeMethodAsync('HandleRightClick', worldX, worldY);
+        } else {
+            dotNetRef.invokeMethodAsync('HandleMouseDown', worldX, worldY);
+        }
+    };
+
+    canvas.onmousemove = (e) => {
+        const { worldX, worldY } = toWorld(e.clientX, e.clientY);
+        dotNetRef.invokeMethodAsync('HandleMouseMove', worldX, worldY);
+    };
+
+    canvas.onmouseup = () => {
+        dotNetRef.invokeMethodAsync('HandleMouseUp');
+    };
+
     canvas.oncontextmenu = (e) => {
         e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const scale = window.gameCanvas?.scale || 20;
-        const simX = (e.clientX - rect.left - canvas.width/2) / scale;
-        const simY = -(e.clientY - rect.top - canvas.height/2) / scale;
-        dotNetRef.invokeMethodAsync('HandleRightClick', simX, simY);
-        return false;
     };
 };
 
-// --- NEW: Cleanup Function ---
+window.setCanvasSetTargetMode = (canvasId, enabled) => {
+    if (!window.gameCanvas.origins[canvasId]) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
+    }
+    window.gameCanvas.setTargetMode[canvasId] = !!enabled;
+};
+
 window.disposeCanvasEvents = (canvasId) => {
     const canvas = document.getElementById(canvasId);
     if (canvas) {
@@ -91,7 +110,6 @@ window.drawCar = (ctx, car, toScreenX, toScreenY) => {
     ctx.fillStyle = "blue";
     ctx.fillRect(-carLen / 2, -carWid / 2, carLen, carWid);
 
-    // Direction indicator
     ctx.fillStyle = "yellow";
     ctx.beginPath();
     ctx.moveTo(0, 0);
