@@ -24,7 +24,7 @@
                 <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
                     @(_isRunning ? "Стоп" : "Старт")
                 </button>
-                <button class="btn btn-secondary" @onclick="ResetTrack">Скинути</button>
+                <button class="btn btn-secondary" @onclick="ClearTrail">Очистити шлях</button>
             </div>
 
             <div class="button-group" style="justify-self: center;">
@@ -38,7 +38,7 @@
                 }
             </div>
 
-            <button class="btn btn-outline-danger" @onclick="ResetTrack">Очистити шлях</button>
+            <button class="btn btn-outline-danger" @onclick="ResetTrack">Скинути</button>
         </div>
     </div>
 
@@ -299,6 +299,15 @@
 
         await JS.InvokeVoidAsync("drawRacing", "raceCanvas", _currentCar, visuals);
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClearTrail()
+    {
+        Sim.HandleInteraction(0, 0, "ClearTrail");
+        if (!_isRunning)
+        {
+            await DrawFrame();
+        }
     }
 
     private void ResetTrack()

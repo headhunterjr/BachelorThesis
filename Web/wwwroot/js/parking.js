@@ -8,7 +8,7 @@
     const toScreenY = (y) => centerY - (y * scale);
 
     // Background grid
-    ctx.strokeStyle = '#E5E7EB';
+    ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
     const gridSize = 20 * scale;
 

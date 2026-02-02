@@ -1,7 +1,6 @@
 ﻿using Core;
 using Web.Data;
 using static Web.Data.Enums;
-using static Web.Services.Scenarios.ParkingScenario;
 
 namespace Web.Services.Scenarios
 {
@@ -23,7 +22,7 @@ namespace Web.Services.Scenarios
         public int Horizon { get; set; } = 30; // Default lower than parking for speed
 
         // 2. Car Type
-        private Enums.CarType _carType = Enums.CarType.GoKart; // Default to GoKart for racing
+        private Enums.CarType _carType = Enums.CarType.Sedan; // Default to GoKart for racing
         public Enums.CarType CurrentCarType
         {
             get => _carType;
@@ -213,10 +212,6 @@ namespace Web.Services.Scenarios
                 }
             }
             int lookAhead = (int)(t * 1.0);
-            if (lookAhead < 1)
-            {
-                lookAhead = 1;
-            }
             int targetIdx = (closestIdx + lookAhead) % _processedPath.Count;
             return _processedPath[targetIdx];
         }
@@ -238,6 +233,10 @@ namespace Web.Services.Scenarios
             else if (mode == "EndDraw")
             {
                 _isDrawing = false; ProcessTrack();
+            }
+            else if (mode == "ClearTrail")
+            {
+                _carTrail.Clear();
             }
         }
 
