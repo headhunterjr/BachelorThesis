@@ -1,23 +1,20 @@
 ﻿using Core;
 using Web.Data;
 using static Web.Data.Enums;
+using System.Text;
 
 namespace Web.Services.Scenarios
 {
-    public class RacingVisuals
-    {
-        public List<double[]> Track { get; set; } = new();
-        public List<double[]> Trail { get; set; } = new();
-        public List<double[]> RawPoints { get; set; } = new();
-    }
-
     public class RacingScenario : ISimulationScenario, ICostModel
     {
         private List<double[]> _trackPoints = new();
         private List<double[]> _processedPath = new();
-        private List<double[]> _carTrail = new();
+
+        private Queue<RacingRecord> _carTrail = new();
+
         private bool _isDrawing = false;
         private double _trackWidth = 10.0;
+        private double _currentTime = 0.0;
 
         public int Horizon { get; set; } = 30; // Default lower than parking for speed
 
@@ -108,10 +105,11 @@ namespace Web.Services.Scenarios
 
         public void Reset()
         {
-            _trackPoints.Clear(); 
-            _processedPath.Clear(); 
-            _carTrail.Clear(); 
+            _trackPoints.Clear();
+            _processedPath.Clear();
+            _carTrail.Clear();
             _isDrawing = false;
+            _currentTime = 0.0;
         }
 
         public BaseStateDTO RunStep(double dt, double[] carState)
@@ -120,16 +118,39 @@ namespace Web.Services.Scenarios
             {
                 return new CarStateDTO { Control = new double[] { 0.0, 0.0 } };
             }
-            _carTrail.Add(new double[] { carState[0], carState[1] });
-
-            int minuteOfTrailData = (int)(1 / dt * 60);
-            if (_carTrail.Count > minuteOfTrailData)
-            {
-                _carTrail.RemoveAt(0);
-            }
 
             var u = ILQR_Controller.Solve(carState, 30, 5, dt, GetPhysicsModel(), this);
+
+            double cost = Evaluate(carState, u, dt, 0);
+
+            _carTrail.Enqueue(new RacingRecord(
+                _currentTime,
+                carState[0], carState[1], carState[2], carState[3],
+                u.ElementAtOrDefault(0), // Accel
+                u.ElementAtOrDefault(1), // Steering
+                cost
+            ));
+            _currentTime += dt;
+
+            // Sliding Window: Keep approx 1 minute of data
+            int minuteOfTrailData = (int)(1.0 / dt * 60.0);
+            if (_carTrail.Count > minuteOfTrailData)
+            {
+                _carTrail.Dequeue();
+            }
+
             return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
+        }
+
+        public string GetCsv()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Time,X,Y,Velocity,Theta,Acceleration,Steering,StepCost");
+            foreach (var r in _carTrail)
+            {
+                sb.AppendLine($"{r.Time:F2},{r.X:F4},{r.Y:F4},{r.Velocity:F4},{r.Theta:F4},{r.Acceleration:F4},{r.Steering:F4},{r.Cost:F4}");
+            }
+            return sb.ToString();
         }
 
         public double Evaluate(double[] x, double[] u, double dt, int t)
@@ -270,7 +291,14 @@ namespace Web.Services.Scenarios
 
         public object GetVisualizationData()
         {
-            return new RacingVisuals { Track = _processedPath, Trail = _carTrail, RawPoints = _isDrawing ? _trackPoints : new List<double[]>() };
+            var trailArrays = _carTrail.Select(r => new double[] { r.X, r.Y }).ToList();
+
+            return new RacingVisuals
+            {
+                Track = _processedPath,
+                Trail = trailArrays,
+                RawPoints = _isDrawing ? _trackPoints : new List<double[]>()
+            };
         }
         public PhysicsModel GetPhysicsModel()
         {

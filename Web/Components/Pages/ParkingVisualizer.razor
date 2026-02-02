@@ -27,7 +27,7 @@
                 </button>
             </div>
 
-            <div class="button-group-center">
+            <div class="button-group">
                 <button class="btn @(_mode == InteractionMode.AddObstacle ? "btn-warning" : "btn-outline-warning")"
                         @onclick="ToggleAddObstacle">
                     @(_mode == InteractionMode.AddObstacle ? "Завершити" : "Додати перешкоду")
@@ -195,6 +195,14 @@
                     </div>
                 </div>
             }
+            <section class="control-section">
+                <h3 class="section-title">Експорт Даних</h3>
+                <div class="control-group">
+                    <button class="btn btn-sm btn-outline-primary" style="width: 100%" @onclick="DownloadData">
+                        Завантажити результати (.csv)
+                    </button>
+                </div>
+            </section>
         </div>
     </div>
 </div>
@@ -269,6 +277,11 @@
         {
             return;
         }
+        if (Context != null) 
+        {
+        
+        }
+
         _timer = new Timer(100);
         _timer.Elapsed += async (s, e) =>
         {
@@ -292,7 +305,10 @@
 
     private async Task Tick()
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
 
         BaseStateDTO baseDto;
         if (_timer != null)
@@ -308,26 +324,29 @@
 
         var obstacles = Sim.GetCurrentVisuals();
 
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
 
         try
         {
-            await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
+            await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, (object)obstacles);
             await InvokeAsync(StateHasChanged);
         }
         catch
         {
-            // Ignore errors that happen during navigation
         }
     }
 
     [JSInvokable]
     public async Task Redraw()
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
 
-        // When common.js finishes setting the target, it calls Redraw.
-        // We capture this to turn off the UI button.
         if (_mode == InteractionMode.SetTarget)
         {
             _mode = InteractionMode.None;
@@ -339,7 +358,10 @@
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
 
         if (_mode == InteractionMode.AddObstacle)
         {
@@ -350,10 +372,10 @@
 
         if (_mode == InteractionMode.SetStart)
         {
-            try
-            {
-                Sim.SetState(new double[] { x, y, InitialVelocity, InitialAngle });
-            }
+            try 
+            { 
+                Sim.SetState(new double[] { x, y, InitialVelocity, InitialAngle }); 
+            } 
             catch
             {
             }
@@ -410,12 +432,23 @@
         Stop();
         Sim.Reset();
         _currentCar = null;
-        try
-        {
-            await JS.InvokeVoidAsync("resetCanvasOrigin", "simCanvas");
-        }
+        try 
+        { 
+            await JS.InvokeVoidAsync("resetCanvasOrigin", "simCanvas"); 
+        } 
         catch { }
         await Tick();
+    }
+
+    private async Task DownloadData()
+    {
+        if (Context == null || _disposed) 
+        {
+            return;
+        }
+        string csv = Context.GetCsv();
+        string fileName = $"parking_data_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
+        await JS.InvokeVoidAsync("downloadCsv", fileName, csv);
     }
 
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)

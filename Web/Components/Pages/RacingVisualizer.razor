@@ -158,6 +158,14 @@
                     </div>
                 </div>
             }
+            <section class="control-section">
+                <h3 class="section-title">Експорт Даних</h3>
+                <div class="control-group">
+                    <button class="btn btn-sm btn-outline-primary" style="width: 100%" @onclick="DownloadData">
+                        Завантажити результати (.csv)
+                    </button>
+                </div>
+            </section>
         </div>
     </div>
 </div>
@@ -206,7 +214,10 @@
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
         if (_isRunning)
         {
             return;
@@ -219,7 +230,10 @@
     [JSInvokable]
     public async Task HandleMouseMove(double x, double y)
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
         if (_isRunning)
         {
             return;
@@ -232,7 +246,10 @@
     [JSInvokable]
     public async Task HandleMouseUp()
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
         if (_isRunning)
         {
             return;
@@ -298,14 +315,20 @@
 
     private async Task Tick()
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
         Sim.RunStep();
         await DrawFrame();
     }
 
     private async Task DrawFrame()
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
 
         var baseDto = Sim.GetCurrentState();
         _currentCar = MapBaseToCar(baseDto); // Store state for telemetry
@@ -321,7 +344,10 @@
 
     private async Task ClearTrail()
     {
-        if (_disposed) return;
+        if (_disposed) 
+        {
+            return;
+        }
         Sim.HandleInteraction(0, 0, "ClearTrail");
         if (!_isRunning)
         {
@@ -335,6 +361,17 @@
         Sim.Reset();
         _trackExists = false;
         _ = DrawFrame();
+    }
+
+    private async Task DownloadData()
+    {
+        if (Context == null || _disposed)
+        {
+            return;
+        }
+        string csv = Context.GetCsv();
+        string fileName = $"racing_data_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
+        await JS.InvokeVoidAsync("downloadCsv", fileName, csv);
     }
 
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)

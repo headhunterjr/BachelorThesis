@@ -1,5 +1,6 @@
 ﻿using Core;
 using Web.Data;
+using System.Text;
 
 namespace Web.Services.Scenarios
 {
@@ -10,6 +11,7 @@ namespace Web.Services.Scenarios
         public bool HasGenerator { get; set; } = true;
         public bool HasSolar { get; set; } = true;
         public bool IsBlackout { get; set; } = false;
+        private List<GridRecord> _history = new();
 
         // --- CUSTOMIZABLE PARAMETERS ---
 
@@ -71,6 +73,8 @@ namespace Web.Services.Scenarios
 
             _genHistory.Clear();
             _genHistory.Add(0.0);
+
+            _history.Clear();
 
             _accumulatedCost = 0;
             _currentStepIndex = 0;
@@ -197,6 +201,7 @@ namespace Web.Services.Scenarios
             r[1] = FuelCost * dt;
 
             // Hessians (Regularization)
+            Q[0, 0] = 0.1; // Fix from previous context: Battery Center Attraction
             R[0, 0] = 0.01;
             R[1, 1] = 0.01;
 
@@ -221,7 +226,6 @@ namespace Web.Services.Scenarios
             double target = BatteryCapacity / 2.0;
             double err = x[0] - target;
             q[0] = 0.1 * err;
-            Q[0, 0] = 0.1;
         }
 
         // --- EXECUTION ---
@@ -236,14 +240,28 @@ namespace Web.Services.Scenarios
             // Cost Accumulation for display
             double stepCost = Evaluate(state, u, dt, _currentStepIndex);
             _accumulatedCost += stepCost;
-            _currentStepIndex++;
 
             // NOTE: We don't have access to the full trajectory from Solve() directly in the DTO return 
             // without modifying ILQR return type. 
             // BUT, for the "RunStep" simulation (advancing time), we only need the first input.
 
             // Simulate one step forward to record history for the graph
-            var nextState = GridStep(state, u, dt, _currentStepIndex - 1);
+            var nextState = GridStep(state, u, dt, _currentStepIndex);
+
+            // --- NEW: Record History ---
+            int safeT = Math.Min(_currentStepIndex, _demand.Length - 1);
+            _history.Add(new GridRecord(
+                _currentStepIndex * dt, // "Hour" approx
+                _demand[safeT],
+                _solar[safeT],
+                _price[safeT],
+                state[0],
+                u[0],
+                u[1],
+                stepCost
+            ));
+
+            _currentStepIndex++;
 
             // Append histories if we haven't already for this step
             if (_batteryHistory.Count <= _currentStepIndex)
@@ -259,6 +277,17 @@ namespace Web.Services.Scenarios
                 State = state,
                 Control = u
             };
+        }
+
+        public string GetCsv()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Hour,Demand,Solar,Price,BatteryLevel,GridUsage,GenUsage,StepCost");
+            foreach (var r in _history)
+            {
+                sb.AppendLine($"{r.Hour:F1},{r.Demand:F2},{r.Solar:F2},{r.Price:F2},{r.BatteryLevel:F2},{r.GridUsage:F2},{r.GenUsage:F2},{r.CurrentCost:F2}");
+            }
+            return sb.ToString();
         }
 
         public object GetVisualizationData()

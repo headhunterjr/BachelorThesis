@@ -1,11 +1,15 @@
 ﻿using Core;
 using Web.Data;
+using System.Text;
 
 namespace Web.Services.Scenarios
 {
     public class ParkingScenario : ISimulationScenario, ICostModel
     {
         private List<Obstacle> _obstacles = new();
+
+        private List<ParkingRecord> _history = new();
+        private double _currentTime = 0.0;
 
         public int Horizon { get; set; } = 50;
         public double ObstacleRadius { get; set; } = 4.0;
@@ -98,13 +102,38 @@ namespace Web.Services.Scenarios
         public void Reset()
         {
             _obstacles.Clear();
+            _history.Clear();
+            _currentTime = 0.0;
         }
 
         public BaseStateDTO RunStep(double dt, double[] carState)
         {
             var state = carState != null && carState.Length >= 4 ? carState : new double[4];
             var u = ILQR_Controller.Solve(state, Horizon, 5, dt, GetPhysicsModel(), this);
+
+            // --- NEW: Record Data ---
+            double cost = Evaluate(state, u, dt, 0);
+            double accel = u.ElementAtOrDefault(0);
+            double steer = u.ElementAtOrDefault(1);
+            _history.Add(new ParkingRecord(
+                _currentTime,
+                state[0], state[1], state[2], state[3],
+                accel, steer, cost
+            ));
+            _currentTime += dt;
+
             return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
+        }
+
+        public string GetCsv()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Time,X,Y,Velocity,Theta,Acceleration,Steering,StepCost");
+            foreach (var r in _history)
+            {
+                sb.AppendLine($"{r.Time:F2},{r.X:F4},{r.Y:F4},{r.Velocity:F4},{r.Theta:F4},{r.Acceleration:F4},{r.Steering:F4},{r.Cost:F4}");
+            }
+            return sb.ToString();
         }
 
         public double Evaluate(double[] x, double[] u, double dt, int t)
@@ -124,9 +153,9 @@ namespace Web.Services.Scenarios
             {
                 err[3] -= 2 * Math.PI;
             }
-            while (err[3] < -Math.PI) 
-            { 
-                err[3] += 2 * Math.PI; 
+            while (err[3] < -Math.PI)
+            {
+                err[3] += 2 * Math.PI;
             }
 
             cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(err), _Q);
