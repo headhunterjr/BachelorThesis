@@ -122,6 +122,12 @@ namespace Web.Services.Scenarios
             }
             _carTrail.Add(new double[] { carState[0], carState[1] });
 
+            int minuteOfTrailData = (int)(1 / dt * 60);
+            if (_carTrail.Count > minuteOfTrailData)
+            {
+                _carTrail.RemoveAt(0);
+            }
+
             var u = ILQR_Controller.Solve(carState, 30, 5, dt, GetPhysicsModel(), this);
             return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
         }

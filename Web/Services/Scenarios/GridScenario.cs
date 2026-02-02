@@ -3,22 +3,7 @@ using Web.Data;
 
 namespace Web.Services.Scenarios
 {
-    // Data Transfer Object for the Frontend Chart
-    public class GridVisuals
-    {
-        public double[]? DemandProfile { get; set; }
-        public double[]? SolarProfile { get; set; }
-        public double[]? PriceProfile { get; set; }
-        // The "Future Plan" the solver calculated
-        public double[]? PlannedBattery { get; set; }
-        public double[]? PlannedGrid { get; set; }
-        public double[]? PlannedGen { get; set; }
-        public double TotalCost { get; set; }
-        public double CurrentCost { get; set; }
-        public int CurrentStep { get; set; } // Added to track progress line
-    }
-
-    public class SmartGridScenario : ISimulationScenario, ICostModel
+    public class GridScenario : ISimulationScenario, ICostModel
     {
         // --- CONFIGURATION ---
         public string Season { get; set; } = "Summer"; // "Summer", "Winter"
@@ -62,7 +47,7 @@ namespace Web.Services.Scenarios
         private double _accumulatedCost = 0;
         private int _currentStepIndex = 0;
 
-        public SmartGridScenario()
+        public GridScenario()
         {
             GenerateRandomDay(); // Create the random noise once
             ApplySystemState();  // Apply the initial settings (Summer, No Blackout, etc)
@@ -269,7 +254,7 @@ namespace Web.Services.Scenarios
             }
 
             // However, to Visualize the plan, we will re-simulate locally:
-            return new SmartGridStateDTO
+            return new GridStateDTO
             {
                 State = state,
                 Control = u

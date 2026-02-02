@@ -1,6 +1,6 @@
 ﻿namespace Web.Data
 {
-    public class SmartGridStateDTO : BaseStateDTO
+    public class GridStateDTO : BaseStateDTO
     {
         // State[0] is Battery Energy
         public double BatteryLevel
@@ -35,9 +35,9 @@
             }
         }
 
-        public SmartGridStateDTO() { }
+        public GridStateDTO() { }
 
-        public SmartGridStateDTO(double[] state, double[] control)
+        public GridStateDTO(double[] state, double[] control)
         {
             State = state ?? Array.Empty<double>();
             Control = control ?? Array.Empty<double>();

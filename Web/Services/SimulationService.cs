@@ -27,7 +27,7 @@ namespace Web.Services
         {
             if (name == "parking") SetScenario(new ParkingScenario());
             else if (name == "racing") SetScenario(new RacingScenario());
-            else if (name == "grid") SetScenario(new SmartGridScenario());
+            else if (name == "grid") SetScenario(new GridScenario());
             else throw new ArgumentException($"Unknown scenario '{name}'");
         }
 
