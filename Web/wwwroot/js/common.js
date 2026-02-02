@@ -11,10 +11,15 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
     const ensureSizeAndOrigin = () => {
         const displayWidth = canvas.clientWidth;
         const displayHeight = canvas.clientHeight;
+
+        // If size changed, update dimensions AND reset origin to center
         if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
             canvas.width = displayWidth;
             canvas.height = displayHeight;
+            window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
         }
+
+        // If origin doesn't exist yet, set to center
         if (!window.gameCanvas.origins[canvasId]) {
             window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
         }
@@ -79,12 +84,24 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
 };
 
 window.setCanvasSetTargetMode = (canvasId, enabled) => {
+    // Ensure origin exists before we try to modify it
     if (!window.gameCanvas.origins[canvasId]) {
         const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
+        if (canvas) {
+            window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
+        }
     }
     window.gameCanvas.setTargetMode[canvasId] = !!enabled;
+};
+
+// --- NEW: Helper to force reset origin to center ---
+window.resetCanvasOrigin = (canvasId) => {
+    const canvas = document.getElementById(canvasId);
+    if (canvas) {
+        window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
+        // Also ensure target mode is off
+        window.gameCanvas.setTargetMode[canvasId] = false;
+    }
 };
 
 window.disposeCanvasEvents = (canvasId) => {
@@ -95,6 +112,10 @@ window.disposeCanvasEvents = (canvasId) => {
         canvas.onmousemove = null;
         canvas.onmouseup = null;
         canvas.oncontextmenu = null;
+
+        // Clean up stored state so next time we visit, it starts fresh (Centered)
+        delete window.gameCanvas.origins[canvasId];
+        delete window.gameCanvas.setTargetMode[canvasId];
     }
 };
 

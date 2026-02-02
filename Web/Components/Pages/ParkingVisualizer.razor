@@ -25,7 +25,6 @@
                 <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
                     @(_isRunning ? "Стоп" : "Старт")
                 </button>
-                <button class="btn btn-secondary" @onclick="Reset">Скинути</button>
             </div>
 
             <div class="button-group-center">
@@ -295,19 +294,19 @@
         _currentCar = MapBaseToCar(baseDto);
 
         var obstacles = Sim.GetCurrentVisuals();
-        // Cast to object to fix dynamic dispatch issue
-        await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, (object)obstacles);
+        await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
         await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
     public async Task Redraw()
     {
-        // Auto-disable SetTarget button when JS reports action complete
+        // When common.js finishes setting the target, it calls Redraw.
+        // We capture this to turn off the UI button.
         if (_mode == InteractionMode.SetTarget)
         {
             _mode = InteractionMode.None;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
         await Tick();
     }
@@ -318,7 +317,6 @@
         if (_mode == InteractionMode.AddObstacle)
         {
             Sim.HandleInteraction(x, y, "AddObstacle");
-            // Do NOT reset mode here, allowing persistent add.
             await Tick();
             return;
         }
@@ -331,15 +329,12 @@
             }
             catch
             {
-
             }
 
             _mode = InteractionMode.None;
             await Tick();
             return;
         }
-
-        // SetTarget is handled via JS origins + Redraw callback
 
         if (Context != null)
         {
@@ -380,14 +375,13 @@
     [JSInvokable]
     public void HandleMouseUp() => _draggedIdx = -1;
 
-    private void Reset()
+    private async Task Reset()
     {
         Stop();
         Sim.Reset();
         _currentCar = null;
-        // Reset JS view origin via JS call logic if needed
-        JS.InvokeVoidAsync("setCanvasSetTargetMode", "simCanvas", false);
-        _ = Tick();
+        await JS.InvokeVoidAsync("resetCanvasOrigin", "simCanvas");
+        await Tick();
     }
 
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
@@ -411,7 +405,6 @@
             }
         }
 
-        // Ensuring telemetry has data even if State array is short
         if (car.State.Length >= 4)
         {
             car.X = car.State[0];
