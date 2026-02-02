@@ -161,6 +161,8 @@
     private Timer? _timer;
     private bool _isRunning = false;
 
+    private bool _disposed = false;
+
     private SmartGridScenario? Context => Sim.ActiveScenario as SmartGridScenario;
 
     protected override async Task OnInitializedAsync()
@@ -170,7 +172,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !_disposed)
         {
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initCanvasEvents", "gridCanvas", _objRef);
@@ -192,14 +194,22 @@
 
     private void Start()
     {
-        if (_timer != null)
+        if (_timer != null || _disposed)
         {
             return;
         }
 
         // Run faster than real time (200ms per "hour" step)
         _timer = new Timer(200);
-        _timer.Elapsed += async (s, e) => await InvokeAsync(async () => await Tick());
+        _timer.Elapsed += async (s, e) =>
+        {
+            if (_disposed)
+            {
+                Stop();
+                return;
+            }
+            await InvokeAsync(async () => await Tick());
+        };
         _timer.Start();
         _isRunning = true;
     }
@@ -213,6 +223,8 @@
 
     private async Task Tick()
     {
+        if (_disposed) return;
+
         // 1. Advance Simulation
         Sim.RunStep();
 
@@ -223,7 +235,7 @@
         if (_visuals != null && _visuals.CurrentStep >= _visuals.DemandProfile.Length)
         {
             Stop();
-            StateHasChanged();
+            if (!_disposed) StateHasChanged();
         }
     }
 
@@ -241,6 +253,7 @@
 
     private async Task Reset()
     {
+        if (_disposed) return;
         Stop();
         Sim.Reset();
         await UpdateVisuals();
@@ -248,12 +261,23 @@
 
     private async Task UpdateVisuals()
     {
+        if (_disposed) return;
+
         _visuals = Sim.GetCurrentVisuals() as GridVisuals;
-        if (_visuals != null)
+
+        if (_visuals != null && !_disposed)
         {
-            await JS.InvokeVoidAsync("drawGrid", "gridCanvas", _visuals);
+            try
+            {
+                await JS.InvokeVoidAsync("drawGrid", "gridCanvas", _visuals);
+            }
+            catch { /* Ignore navigation errors */ }
         }
-        StateHasChanged();
+
+        if (!_disposed)
+        {
+            StateHasChanged();
+        }
     }
 
     [JSInvokable]
@@ -270,6 +294,8 @@
 
     public void Dispose()
     {
+        _disposed = true;
+
         Stop();
         try { ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "gridCanvas"); } catch { }
         _objRef?.Dispose();

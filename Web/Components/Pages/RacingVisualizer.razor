@@ -169,6 +169,8 @@
     private bool _isRunning = false;
     private bool _trackExists = false;
 
+    private bool _disposed = false;
+
     private RacingScenario? Context => Sim.ActiveScenario as RacingScenario;
 
     protected override async Task OnInitializedAsync()
@@ -179,7 +181,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !_disposed)
         {
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initCanvasEvents", "raceCanvas", _objRef);
@@ -204,6 +206,7 @@
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
+        if (_disposed) return;
         if (_isRunning)
         {
             return;
@@ -216,6 +219,7 @@
     [JSInvokable]
     public async Task HandleMouseMove(double x, double y)
     {
+        if (_disposed) return;
         if (_isRunning)
         {
             return;
@@ -228,6 +232,7 @@
     [JSInvokable]
     public async Task HandleMouseUp()
     {
+        if (_disposed) return;
         if (_isRunning)
         {
             return;
@@ -271,7 +276,15 @@
         }
 
         _timer = new Timer(Sim.Dt * 1000);
-        _timer.Elapsed += async (s, e) => await Tick();
+        _timer.Elapsed += async (s, e) =>
+        {
+            if (_disposed)
+            {
+                Stop();
+                return;
+            }
+            await Tick();
+        };
         _timer.Start();
         _isRunning = true;
     }
@@ -285,22 +298,30 @@
 
     private async Task Tick()
     {
+        if (_disposed) return;
         Sim.RunStep();
         await DrawFrame();
     }
 
     private async Task DrawFrame()
     {
+        if (_disposed) return;
+
         var baseDto = Sim.GetCurrentState();
         _currentCar = MapBaseToCar(baseDto); // Store state for telemetry
         var visuals = Sim.GetCurrentVisuals();
 
-        await JS.InvokeVoidAsync("drawRacing", "raceCanvas", _currentCar, visuals);
-        await InvokeAsync(StateHasChanged);
+        try
+        {
+            await JS.InvokeVoidAsync("drawRacing", "raceCanvas", _currentCar, visuals);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
     }
 
     private async Task ClearTrail()
     {
+        if (_disposed) return;
         Sim.HandleInteraction(0, 0, "ClearTrail");
         if (!_isRunning)
         {
@@ -340,6 +361,7 @@
 
     public void Dispose()
     {
+        _disposed = true;
         Stop();
         try { ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "raceCanvas"); } catch { }
         _objRef?.Dispose();

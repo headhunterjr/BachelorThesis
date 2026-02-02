@@ -204,6 +204,8 @@
     private InteractionMode _mode = InteractionMode.None;
     private bool _isRunning = false;
 
+    private bool _disposed = false;
+
     private Timer? _timer;
     private CarStateDTO? _currentCar;
     private DotNetObjectReference<ParkingVisualizer>? _objRef;
@@ -222,7 +224,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !_disposed)
         {
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initCanvasEvents", "simCanvas", _objRef);
@@ -250,6 +252,7 @@
 
     private async Task ToggleSetTarget()
     {
+        if (_disposed) return;
         bool enabling = (_mode != InteractionMode.SetTarget);
         _mode = enabling ? InteractionMode.SetTarget : InteractionMode.None;
         await JS.InvokeVoidAsync("setCanvasSetTargetMode", "simCanvas", enabling);
@@ -267,7 +270,15 @@
             return;
         }
         _timer = new Timer(100);
-        _timer.Elapsed += async (s, e) => await Tick();
+        _timer.Elapsed += async (s, e) =>
+        {
+            if (_disposed)
+            {
+                Stop();
+                return;
+            }
+            await Tick();
+        };
         _timer.Start();
         _isRunning = true;
     }
@@ -281,6 +292,8 @@
 
     private async Task Tick()
     {
+        if (_disposed) return;
+
         BaseStateDTO baseDto;
         if (_timer != null)
         {
@@ -294,13 +307,25 @@
         _currentCar = MapBaseToCar(baseDto);
 
         var obstacles = Sim.GetCurrentVisuals();
-        await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
-        await InvokeAsync(StateHasChanged);
+
+        if (_disposed) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("drawParking", "simCanvas", _currentCar, obstacles);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Ignore errors that happen during navigation
+        }
     }
 
     [JSInvokable]
     public async Task Redraw()
     {
+        if (_disposed) return;
+
         // When common.js finishes setting the target, it calls Redraw.
         // We capture this to turn off the UI button.
         if (_mode == InteractionMode.SetTarget)
@@ -314,6 +339,8 @@
     [JSInvokable]
     public async Task HandleMouseDown(double x, double y)
     {
+        if (_disposed) return;
+
         if (_mode == InteractionMode.AddObstacle)
         {
             Sim.HandleInteraction(x, y, "AddObstacle");
@@ -358,6 +385,7 @@
     [JSInvokable]
     public async Task HandleRightClick(double x, double y)
     {
+        if (_disposed) return;
         Sim.HandleInteraction(x, y, "RemoveObstacle");
         await Tick();
     }
@@ -365,6 +393,7 @@
     [JSInvokable]
     public async Task HandleMouseMove(double x, double y)
     {
+        if (_disposed) return;
         if (_draggedIdx != -1 && Context != null)
         {
             Context.UpdateObstacle(_draggedIdx, x, y);
@@ -377,10 +406,15 @@
 
     private async Task Reset()
     {
+        if (_disposed) return;
         Stop();
         Sim.Reset();
         _currentCar = null;
-        await JS.InvokeVoidAsync("resetCanvasOrigin", "simCanvas");
+        try
+        {
+            await JS.InvokeVoidAsync("resetCanvasOrigin", "simCanvas");
+        }
+        catch { }
         await Tick();
     }
 
@@ -418,6 +452,7 @@
 
     public void Dispose()
     {
+        _disposed = true;
         _timer?.Dispose();
         try { ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "simCanvas"); } catch { }
         _objRef?.Dispose();
