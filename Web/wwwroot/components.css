@@ -627,7 +627,10 @@
         font-size: 0.9rem;
     }
 
-    /* Home page */
+    .home-wrapper {
+        overflow-y: auto;
+    }
+
     .main-title {
         font-size: 2.5rem;
     }
@@ -658,11 +661,8 @@
     }
 }
 
-/* --- NARROW (≤640px): nav links become icon-only, brand stays --- */
+/* --- NARROW (≤640px): nav links become icon-only, buttons stack --- */
 @media (max-width: 640px) {
-    /* Icon-only nav: font-size:0 collapses the text node,
-       icon renders via its own explicit width/height.
-       Brand stays left, links stay right (space-between is inherited). */
     .nav-item {
         font-size: 0;
         gap: 0;
@@ -680,23 +680,40 @@
         gap: 0.15rem;
     }
 
+    /* Buttons: Everything stacks, full width */
     .control-buttons {
         justify-content: center;
+        flex-direction: column;
+        align-items: stretch;
     }
 
-    .button-group-center {
-        flex: 1 1 100%;
-        margin: 0;
-    }
-
+    /* Track status: Move to top */
     .track-status {
-        flex: 1 1 100%;
-        margin: 0.25rem 0;
+        order: -1; /* Moves before everything else */
+        flex: none;
+        width: 100%;
+        margin: 0 0 0.5rem 0;
     }
 
-    .btn-outline-danger {
-        flex: 1 1 auto;
+    /* All button groups stack vertically, full width */
+    .button-group,
+    .btn-group,
+    .button-group-center {
+        flex: none;
+        width: 100%;
+        margin: 0;
+        flex-direction: column;
     }
+
+        /* Every button takes full width */
+        .button-group .btn,
+        .btn-group .btn,
+        .button-group-center .btn,
+        .btn-outline-danger {
+            width: 100%;
+            max-width: none;
+            min-width: 0;
+        }
 }
 
 /* --- SMALL MOBILE (≤480px) --- */
@@ -724,46 +741,9 @@
         font-size: 1.1rem;
     }
 
-    .control-buttons {
-        gap: 0.4rem;
-        justify-content: center;
-    }
-
-        .control-buttons .btn {
-            padding: 0.4rem 0.65rem;
-            font-size: 0.8rem;
-            min-width: 100px;
-        }
-
-    .button-group,
-    .btn-group {
-        flex: 0 1 auto;
-    }
-
-    .button-group-center {
-        margin: 0;
-        flex: 1 1 100%;
-        justify-content: center;
-    }
-
-    .button-group-center {
-        margin: 0;
-        flex-direction: column;
-    }
-
-    .button-group:first-child .btn {
-        min-width: 85px;
-    }
-
-    .btn-outline-danger {
-        flex: 1 1 100%;
-        max-width: 200px;
-    }
-
-    .track-status {
-        font-size: 0.75rem;
-        margin: 0;
-        flex: 1 1 100%;
+    .control-buttons .btn {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.8rem;
     }
 
     .control-panel {
@@ -775,7 +755,10 @@
         padding: 0.75rem;
     }
 
-    /* Home page */
+    .home-wrapper {
+        overflow-y: auto;
+    }
+
     .main-title {
         font-size: 2rem;
     }

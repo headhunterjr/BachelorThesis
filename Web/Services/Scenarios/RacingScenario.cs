@@ -19,8 +19,8 @@ namespace Web.Services.Scenarios
         public int Horizon { get; set; } = 30; // Default lower than parking for speed
 
         // 2. Car Type
-        private Enums.CarType _carType = Enums.CarType.Sedan; // Default to GoKart for racing
-        public Enums.CarType CurrentCarType
+        private CarType _carType = CarType.Sedan; // Default to GoKart for racing
+        public CarType CurrentCarType
         {
             get => _carType;
             set
