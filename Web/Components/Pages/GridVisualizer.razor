@@ -208,7 +208,6 @@
             return;
         }
 
-        // Run faster than real time (200ms per "hour" step)
         _timer = new Timer(200);
         _timer.Elapsed += async (s, e) =>
         {
@@ -234,13 +233,8 @@
     {
         if (_disposed) return;
 
-        // 1. Advance Simulation
         Sim.RunStep();
-
-        // 2. Refresh UI
         await UpdateVisuals();
-
-        // 3. Auto-stop if we reach end of profile
         if (_visuals != null && _visuals.CurrentStep >= _visuals.DemandProfile.Length)
         {
             Stop();
@@ -253,7 +247,7 @@
 
     private async Task RunSingleStep()
     {
-        Stop(); // Ensure auto-play is off if stepping manually
+        Stop();
         await Tick();
     }
 

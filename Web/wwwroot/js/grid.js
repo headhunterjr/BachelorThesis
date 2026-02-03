@@ -11,12 +11,11 @@
     const startY = height - padding;
 
     const steps = data.demandProfile.length;
-    const maxPower = 120; // Fixed scale for stability
+    const maxPower = 120;
 
     const toX = (i) => startX + (i / (steps - 1)) * graphW;
     const toY = (val) => startY - (val / maxPower) * graphH;
 
-    // 1. AXES
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -26,7 +25,6 @@
     ctx.lineTo(startX + graphW, startY);
     ctx.stroke();
 
-    // 2. SOLAR (Fill)
     if (data.solarProfile) {
         ctx.fillStyle = 'rgba(251, 191, 36, 0.1)';
         ctx.beginPath();
@@ -36,17 +34,13 @@
         ctx.fill();
     }
 
-    // --- NEW LINES ---
-
-    // 3. GENERATOR (Orange Line)
     if (data.plannedGen && data.currentStep > 0) {
-        ctx.strokeStyle = '#F97316'; // Orange
+        ctx.strokeStyle = '#F97316';
         ctx.lineWidth = 2;
-        ctx.setLineDash([2, 2]); // Dotted to differentiate from Grid
+        ctx.setLineDash([2, 2]);
         ctx.beginPath();
         for (let i = 0; i < data.currentStep && i < data.plannedGen.length; i++) {
             const val = data.plannedGen[i];
-            // Clip negatives visually (shouldn't happen with generator but safe to do)
             const yVal = Math.max(0, val);
             if (i === 0) ctx.moveTo(toX(i), toY(yVal));
             else ctx.lineTo(toX(i), toY(yVal));
@@ -55,17 +49,12 @@
         ctx.setLineDash([]);
     }
 
-    // 4. GRID IMPORT (Blue Line)
     if (data.plannedGrid && data.currentStep > 0) {
-        ctx.strokeStyle = '#3B82F6'; // Blue
+        ctx.strokeStyle = '#3B82F6';
         ctx.lineWidth = 2;
         ctx.beginPath();
         for (let i = 0; i < data.currentStep && i < data.plannedGrid.length; i++) {
             const val = data.plannedGrid[i];
-            // Grid can be negative (export). We map it directly.
-            // If it goes below y-axis, it just clips off bottom or we could center axis.
-            // For now, let's clamp visual at 0 for simplicity or allow it to dip? 
-            // Let's allow dip visually but maybe clamp strictly for this chart type.
             const yVal = val;
             if (i === 0) ctx.moveTo(toX(i), toY(yVal));
             else ctx.lineTo(toX(i), toY(yVal));
@@ -73,9 +62,8 @@
         ctx.stroke();
     }
 
-    // 5. DEMAND (Purple Line - Background Context)
     if (data.demandProfile) {
-        ctx.strokeStyle = 'rgba(192, 132, 252, 0.4)'; // Purple (Faded)
+        ctx.strokeStyle = 'rgba(192, 132, 252, 0.4)';
         ctx.lineWidth = 4;
         ctx.beginPath();
         data.demandProfile.forEach((val, i) => {
@@ -85,7 +73,6 @@
         ctx.stroke();
     }
 
-    // 6. BATTERY LEVEL (Green Line - Main Focus)
     if (data.plannedBattery && data.currentStep > 0) {
         ctx.strokeStyle = '#10B981';
         ctx.lineWidth = 3;
@@ -101,7 +88,6 @@
         ctx.shadowBlur = 0;
     }
 
-    // 7. TIME MARKER
     if (data.currentStep >= 0 && data.currentStep < steps) {
         const xNow = toX(data.currentStep);
         ctx.strokeStyle = '#F1F5F9';
@@ -119,7 +105,6 @@
         ctx.fillText(`${hour}:00`, xNow + 5, padding + 10);
     }
 
-    // 8. PRICE BAR
     const barHeight = 10;
     const barY = startY + 15;
     data.priceProfile.forEach((price, i) => {
@@ -132,11 +117,10 @@
         ctx.fillRect(x, barY, w, barHeight);
     });
 
-    // LEGEND
     ctx.font = '12px Inter, sans-serif';
 
     let lx = startX + 20;
-    const spacing = 20; // Space between items
+    const spacing = 20;
 
     const legendItems = [
         { text: "● Акумулятор", color: '#10B981' },
@@ -148,7 +132,6 @@
     legendItems.forEach(item => {
         ctx.fillStyle = item.color;
         ctx.fillText(item.text, lx, padding);
-        // Move X by the exact width of the text plus spacing
         lx += ctx.measureText(item.text).width + spacing;
     });
 };

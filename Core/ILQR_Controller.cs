@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Core
+﻿namespace Core
 {
     public class ILQR_Controller
     {

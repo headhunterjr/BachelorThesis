@@ -11,7 +11,7 @@
 /* Page Content Area */
 .page-content {
     flex: 1;
-    min-height: 0; /* Critical: allows flex child to shrink below content size */
+    min-height: 0;
     overflow: hidden;
     position: relative;
     display: flex;
@@ -224,7 +224,6 @@
 }
 
 /* Control Buttons (Bottom of Canvas) */
-/* Control Buttons (Bottom of Canvas) */
 .control-buttons {
     flex-shrink: 0;
     display: flex;
@@ -252,14 +251,13 @@
     margin: 0 1rem;
 }
 
-/* Action buttons - fixed min-width based on longest text */
+/* Action buttons */
 .control-buttons .btn {
-    min-width: 130px; /* Fits "Встановити центр" comfortably */
+    min-width: 130px;
     flex: 0 0 auto;
     white-space: nowrap;
 }
 
-/* Override for start/stop/reset group - smaller min-width */
 .button-group:first-child .btn {
     min-width: 90px;
 }
@@ -483,11 +481,7 @@
     color: var(--secondary);
 }
 
-/* =================================================================
-   RESPONSIVE BREAKPOINTS
-   ================================================================= */
 
-/* --- TABLET (≤1024px): control panel moves below canvas --- */
 @media (max-width: 1024px) {
     .visualizer-container {
         flex-direction: column;
@@ -521,7 +515,7 @@
     }
 }
 
-/* --- MOBILE (≤768px) --- */
+
 @media (max-width: 768px) {
     .top-bar {
         height: 52px;
@@ -661,7 +655,7 @@
     }
 }
 
-/* --- NARROW (≤640px): nav links become icon-only, buttons stack --- */
+
 @media (max-width: 640px) {
     .nav-item {
         font-size: 0;
@@ -680,22 +674,22 @@
         gap: 0.15rem;
     }
 
-    /* Buttons: Everything stacks, full width */
+
     .control-buttons {
         justify-content: center;
         flex-direction: column;
         align-items: stretch;
     }
 
-    /* Track status: Move to top */
+
     .track-status {
-        order: -1; /* Moves before everything else */
+        order: -1;
         flex: none;
         width: 100%;
         margin: 0 0 0.5rem 0;
     }
 
-    /* All button groups stack vertically, full width */
+
     .button-group,
     .btn-group,
     .button-group-center {
@@ -705,7 +699,7 @@
         flex-direction: column;
     }
 
-        /* Every button takes full width */
+
         .button-group .btn,
         .btn-group .btn,
         .button-group-center .btn,
@@ -716,7 +710,7 @@
         }
 }
 
-/* --- SMALL MOBILE (≤480px) --- */
+
 @media (max-width: 480px) {
     .nav-container {
         padding: 0 0.5rem;

@@ -1,6 +1,6 @@
 ﻿using Core;
-using Web.Data;
 using System.Text;
+using Web.Data;
 
 namespace Web.Services.Scenarios
 {
@@ -31,8 +31,8 @@ namespace Web.Services.Scenarios
             get => _Q[0, 0];
             set
             {
-                _Q[0, 0] = value; // X precision
-                _Q[1, 1] = value; // Y precision
+                _Q[0, 0] = value;
+                _Q[1, 1] = value;
             }
         }
 
@@ -71,7 +71,6 @@ namespace Web.Services.Scenarios
             { 0, 10000 }
         };
 
-        // Cache the physics engine so we don't recreate it every step
         private PhysicsEngine _physicsEngine;
 
         public ParkingScenario()
@@ -84,16 +83,13 @@ namespace Web.Services.Scenarios
             switch (_carType)
             {
                 case Enums.CarType.GoKart:
-                    // Twitchy, agile, small turning radius
                     _physicsEngine = new PhysicsEngine(1.5, 0.8, 15.0);
                     break;
                 case Enums.CarType.Limo:
-                    // Heavy, slow turning, stable
                     _physicsEngine = new PhysicsEngine(3.5, 0.5, 8.0);
                     break;
                 case Enums.CarType.Sedan:
                 default:
-                    // Balanced
                     _physicsEngine = new PhysicsEngine(2.5, 0.7, 10.0);
                     break;
             }
@@ -111,7 +107,6 @@ namespace Web.Services.Scenarios
             var state = carState != null && carState.Length >= 4 ? carState : new double[4];
             var u = ILQR_Controller.Solve(state, Horizon, 5, dt, GetPhysicsModel(), this);
 
-            // --- NEW: Record Data ---
             double cost = Evaluate(state, u, dt, 0);
             double accel = u.ElementAtOrDefault(0);
             double steer = u.ElementAtOrDefault(1);
@@ -268,7 +263,6 @@ namespace Web.Services.Scenarios
             return _obstacles;
         }
 
-        // Wrap our configured instance in the PhysicsModel DTO
         public PhysicsModel GetPhysicsModel()
         {
             return new PhysicsModel(_physicsEngine.Step, _physicsEngine.Linearize, 4, 2);

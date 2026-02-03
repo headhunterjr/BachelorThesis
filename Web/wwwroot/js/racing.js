@@ -13,7 +13,6 @@
     const trail = data.trail || data.Trail;
     const rawPoints = data.rawPoints || data.RawPoints;
 
-    // Background grid
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
     const gridSize = 20 * scale;
@@ -32,7 +31,6 @@
         ctx.stroke();
     }
 
-    // Center axes
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 5]);
@@ -49,7 +47,6 @@
 
     ctx.setLineDash([]);
 
-    // 1. Draw Raw Drawing Points (while drawing - before processing)
     if (rawPoints && rawPoints.length > 0) {
         ctx.strokeStyle = '#7C3AED';
         ctx.lineWidth = 3;
@@ -65,7 +62,6 @@
         });
         ctx.stroke();
 
-        // Draw points
         ctx.fillStyle = '#7C3AED';
         rawPoints.forEach((p) => {
             const sx = toScreenX(p[0]);
@@ -76,9 +72,7 @@
         });
     }
 
-    // 2. Draw Processed Track (after drawing is complete)
     if (track && track.length > 0) {
-        // Track boundaries (wider, subtle)
         ctx.strokeStyle = 'rgba(124, 58, 237, 0.1)';
         ctx.lineWidth = 15 * scale;
         ctx.lineCap = 'round';
@@ -92,7 +86,6 @@
         });
         ctx.stroke();
 
-        // Center line (purple)
         ctx.strokeStyle = '#7C3AED';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -105,7 +98,6 @@
         ctx.stroke();
     }
 
-    // 3. Draw Car Trail (turquoise with glow)
     if (trail && trail.length > 0) {
         ctx.strokeStyle = '#14B8A6';
         ctx.lineWidth = 2;
@@ -124,7 +116,6 @@
         ctx.shadowBlur = 0;
     }
 
-    // 4. Draw Car
     if (car && track && track.length > 0) {
         const carX = toScreenX(car.x);
         const carY = toScreenY(car.y);
@@ -135,7 +126,6 @@
         ctx.translate(carX, carY);
         ctx.rotate(-car.theta);
 
-        // Car body
         ctx.fillStyle = '#7C3AED';
         ctx.fillRect(-carLen / 2, -carWid / 2, carLen, carWid);
 
@@ -143,11 +133,9 @@
         ctx.lineWidth = 2;
         ctx.strokeRect(-carLen / 2, -carWid / 2, carLen, carWid);
 
-        // Windows
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.fillRect(-carLen / 2 + 4, -carWid / 2 + 3, carLen * 0.3, carWid - 6);
 
-        // Direction indicator
         ctx.fillStyle = '#14B8A6';
         ctx.beginPath();
         ctx.moveTo(carLen / 2 - 6, 0);

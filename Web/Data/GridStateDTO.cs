@@ -2,7 +2,6 @@
 {
     public class GridStateDTO : BaseStateDTO
     {
-        // State[0] is Battery Energy
         public double BatteryLevel
         {
             get => State.Length > 0 ? State[0] : 0.0;
@@ -13,7 +12,6 @@
             }
         }
 
-        // Control[0] is Grid Import/Export
         public double GridPower
         {
             get => Control.Length > 0 ? Control[0] : 0.0;
@@ -24,7 +22,6 @@
             }
         }
 
-        // Control[1] is Generator Output
         public double GenPower
         {
             get => Control.Length > 1 ? Control[1] : 0.0;

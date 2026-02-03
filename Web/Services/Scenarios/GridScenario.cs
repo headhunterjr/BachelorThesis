@@ -1,6 +1,6 @@
 ﻿using Core;
-using Web.Data;
 using System.Text;
+using Web.Data;
 
 namespace Web.Services.Scenarios
 {

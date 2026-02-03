@@ -1,7 +1,6 @@
 ﻿using Core;
-using Web.Data;
-using static Web.Data.Enums;
 using System.Text;
+using Web.Data;
 
 namespace Web.Services.Scenarios
 {
@@ -16,11 +15,10 @@ namespace Web.Services.Scenarios
         private double _trackWidth = 10.0;
         private double _currentTime = 0.0;
 
-        public int Horizon { get; set; } = 30; // Default lower than parking for speed
+        public int Horizon { get; set; } = 30;
 
-        // 2. Car Type
-        private CarType _carType = CarType.Sedan; // Default to GoKart for racing
-        public CarType CurrentCarType
+        private Enums.CarType _carType = Enums.CarType.Sedan;
+        public Enums.CarType CurrentCarType
         {
             get => _carType;
             set
@@ -30,28 +28,23 @@ namespace Web.Services.Scenarios
             }
         }
 
-        // Cost to deviate from the track line (Cross-Track Error)
         public double PrecisionPosition
         {
             get => _Q[0, 0];
             set { _Q[0, 0] = value; _Q[1, 1] = value; }
         }
 
-        // Cost to deviate from target velocity
         public double PrecisionVelocity
         {
             get => _Q[2, 2];
             set => _Q[2, 2] = value;
         }
 
-        // Cost to deviate from track angle (Heading Error)
         public double PrecisionAngle
         {
             get => _Q[3, 3];
             set => _Q[3, 3] = value;
         }
-
-        // 4. Matrix Weights (R - Smoothness)
 
         public double SmoothnessAccel
         {
@@ -87,17 +80,14 @@ namespace Web.Services.Scenarios
         {
             switch (_carType)
             {
-                case CarType.GoKart:
-                    // Twitchy, agile, small turning radius
+                case Enums.CarType.GoKart:
                     _physicsEngine = new PhysicsEngine(1.5, 0.8, 15.0);
                     break;
-                case CarType.Limo:
-                    // Heavy, slow turning, stable
+                case Enums.CarType.Limo:
                     _physicsEngine = new PhysicsEngine(3.5, 0.5, 8.0);
                     break;
-                case CarType.Sedan:
+                case Enums.CarType.Sedan:
                 default:
-                    // Balanced
                     _physicsEngine = new PhysicsEngine(2.5, 0.7, 10.0);
                     break;
             }
@@ -126,13 +116,12 @@ namespace Web.Services.Scenarios
             _carTrail.Enqueue(new RacingRecord(
                 _currentTime,
                 carState[0], carState[1], carState[2], carState[3],
-                u.ElementAtOrDefault(0), // Accel
-                u.ElementAtOrDefault(1), // Steering
+                u.ElementAtOrDefault(0),
+                u.ElementAtOrDefault(1),
                 cost
             ));
             _currentTime += dt;
 
-            // Sliding Window: Keep approx 1 minute of data
             int minuteOfTrailData = (int)(1.0 / dt * 60.0);
             if (_carTrail.Count > minuteOfTrailData)
             {

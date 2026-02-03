@@ -322,6 +322,11 @@
 
         _currentCar = MapBaseToCar(baseDto);
 
+        if (_timer != null && Math.Abs(_currentCar.Velocity) < 0.01)
+        {
+            Stop();
+        }
+
         var obstacles = Sim.GetCurrentVisuals();
 
         if (_disposed) 
