@@ -7,10 +7,17 @@ namespace Web.Services.Scenarios
     public class ParkingScenario : ISimulationScenario, ICostModel
     {
         private List<Obstacle> _obstacles = new();
+        private List<(double X, double Y, double Phase)> _obstacleOrigins = new();
 
         private List<ParkingRecord> _history = new();
         private double _currentTime = 0.0;
+        private double movingObstacleWeightMultiplier = 10.0;
 
+        public bool EnableObstacleMovement { get; set; } = false;
+        public bool MoveHorizontal { get; set; } = true;
+        public bool MoveVertical { get; set; } = false;
+        public double MovementRange { get; set; } = 3.0;
+        public double MovementSpeed { get; set; } = 1.5;
         public int Horizon { get; set; } = 50;
         public double ObstacleRadius { get; set; } = 4.0;
         public double ObstacleWeight { get; set; } = 50000.0;
@@ -104,6 +111,40 @@ namespace Web.Services.Scenarios
 
         public BaseStateDTO RunStep(double dt, double[] carState)
         {
+            if (EnableObstacleMovement)
+            {
+                for (int i = 0; i < _obstacles.Count; ++i)
+                {
+                    var origin = _obstacleOrigins[i];
+                    double offset = Math.Sin(_currentTime * MovementSpeed + origin.Phase) * MovementRange;
+
+                    if (MoveHorizontal)
+                    {
+                        _obstacles[i].X = origin.X + offset;
+                    }
+                    else
+                    {
+                        _obstacles[i].X = origin.X;
+                    }
+
+                    if (MoveVertical)
+                    {
+                        _obstacles[i].Y = origin.Y + offset;
+                    }
+                    else
+                    {
+                        _obstacles[i].Y = origin.Y;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < _obstacles.Count; ++i)
+                {
+                    _obstacles[i].X = _obstacleOrigins[i].X;
+                    _obstacles[i].Y = _obstacleOrigins[i].Y;
+                }
+            }
             var state = carState != null && carState.Length >= 4 ? carState : new double[4];
             var u = ILQR_Controller.Solve(state, Horizon, 5, dt, GetPhysicsModel(), this);
 
@@ -159,7 +200,8 @@ namespace Web.Services.Scenarios
             foreach (var obs in _obstacles)
             {
                 double dSq = Math.Pow(x[0] - obs.X, 2) + Math.Pow(x[1] - obs.Y, 2);
-                cost += obs.Weight * Math.Exp(-dSq / (obs.Radius * obs.Radius));
+                double effectiveWeight = EnableObstacleMovement ? obs.Weight * movingObstacleWeightMultiplier : obs.Weight;
+                cost += effectiveWeight * Math.Exp(-dSq / (obs.Radius * obs.Radius));
             }
             return cost;
         }
@@ -214,7 +256,8 @@ namespace Web.Services.Scenarios
                 double distSq = dx * dx + dy * dy;
                 double rSq = obs.Radius * obs.Radius;
 
-                double costVal = obs.Weight * Math.Exp(-distSq / rSq);
+                double effectiveWeight = EnableObstacleMovement ? obs.Weight * movingObstacleWeightMultiplier : obs.Weight;
+                double costVal = effectiveWeight * Math.Exp(-distSq / rSq);
                 double factor = costVal * (-2.0 / rSq);
 
                 q[0] += factor * dx;
@@ -236,15 +279,18 @@ namespace Web.Services.Scenarios
             if (mode == "AddObstacle")
             {
                 _obstacles.Add(new Obstacle { X = x, Y = y, Radius = ObstacleRadius, Weight = ObstacleWeight });
+                _obstacleOrigins.Add((x, y, x * 0.5));
             }
             else if (mode == "RemoveObstacle")
             {
-                for (int i = 0; i < _obstacles.Count; i++)
+                for (int i = 0; i < _obstacles.Count; ++i)
                 {
                     double d = Math.Sqrt(Math.Pow(x - _obstacles[i].X, 2) + Math.Pow(y - _obstacles[i].Y, 2));
                     if (d < _obstacles[i].Radius)
                     {
-                        _obstacles.RemoveAt(i); break;
+                        _obstacles.RemoveAt(i);
+                        _obstacleOrigins.RemoveAt(i);
+                        break;
                     }
                 }
             }
@@ -254,7 +300,10 @@ namespace Web.Services.Scenarios
         {
             if (index >= 0 && index < _obstacles.Count)
             {
-                _obstacles[index].X = x; _obstacles[index].Y = y;
+                _obstacles[index].X = x;
+                _obstacles[index].Y = y;
+                var old = _obstacleOrigins[index];
+                _obstacleOrigins[index] = (x, y, old.Phase);
             }
         }
 
