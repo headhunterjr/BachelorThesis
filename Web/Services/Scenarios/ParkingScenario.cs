@@ -197,9 +197,38 @@ namespace Web.Services.Scenarios
             cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(err), _Q);
             cost += Helpers.VectorQuadForm(Helpers.ToColumnVector(u), _R);
 
-            foreach (var obs in _obstacles)
+            for (int i = 0; i < _obstacles.Count; ++i)
             {
-                double dSq = Math.Pow(x[0] - obs.X, 2) + Math.Pow(x[1] - obs.Y, 2);
+                var obs = _obstacles[i];
+                double obsX = obs.X;
+                double obsY = obs.Y;
+
+                if (EnableObstacleMovement && i < _obstacleOrigins.Count)
+                {
+                    var origin = _obstacleOrigins[i];
+                    double futureTime = _currentTime + t * dt;
+                    double offset = Math.Sin(futureTime * MovementSpeed + origin.Phase) * MovementRange;
+
+                    if (MoveHorizontal)
+                    {
+                        obsX = origin.X + offset;
+                    }
+                    else
+                    {
+                        obsX = origin.X;
+                    }
+
+                    if (MoveVertical)
+                    {
+                        obsY = origin.Y + offset;
+                    }
+                    else
+                    {
+                        obsY = origin.Y;
+                    }
+                }
+
+                double dSq = Math.Pow(x[0] - obsX, 2) + Math.Pow(x[1] - obsY, 2);
                 double effectiveWeight = EnableObstacleMovement ? obs.Weight * movingObstacleWeightMultiplier : obs.Weight;
                 cost += effectiveWeight * Math.Exp(-dSq / (obs.Radius * obs.Radius));
             }
@@ -249,10 +278,38 @@ namespace Web.Services.Scenarios
                 }
             }
 
-            foreach (var obs in _obstacles)
+            for (int i = 0; i < _obstacles.Count; ++i)
             {
-                double dx = x[0] - obs.X;
-                double dy = x[1] - obs.Y;
+                var obs = _obstacles[i];
+                double obsX = obs.X;
+                double obsY = obs.Y;
+
+                if (EnableObstacleMovement && i < _obstacleOrigins.Count)
+                {
+                    var origin = _obstacleOrigins[i];
+                    double futureTime = _currentTime + t * dt;
+                    double offset = Math.Sin(futureTime * MovementSpeed + origin.Phase) * MovementRange;
+
+                    if (MoveHorizontal)
+                    {
+                        obsX = origin.X + offset;
+                    }
+                    else
+                    {
+                        obsX = origin.X;
+                    }
+                    if (MoveVertical)
+                    {
+                        obsY = origin.Y + offset;
+                    }
+                    else
+                    {
+                        obsY = origin.Y;
+                    }
+                }
+
+                double dx = x[0] - obsX;
+                double dy = x[1] - obsY;
                 double distSq = dx * dx + dy * dy;
                 double rSq = obs.Radius * obs.Radius;
 
