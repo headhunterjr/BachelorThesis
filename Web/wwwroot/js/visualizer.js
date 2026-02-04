@@ -1,13 +1,16 @@
 ﻿window.drawSimulation = (canvasId, car, obstacles) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
     const ctx = canvas.getContext('2d');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const scale = 5;
+    const visibleWorldWidth = 220.0;
+    const scale = canvas.width / visibleWorldWidth;
 
     const toX = (val) => centerX + (val * scale);
     const toY = (val) => centerY - (val * scale);
@@ -38,43 +41,4 @@
         ctx.fillRect(6, -2, 4, 4); 
         ctx.restore();
     }
-};
-
-let draggedObstacleIndex = -1;
-
-function toMeters(pixelValue, offset, scale) {
-    return (pixelValue - offset) / scale;
-}
-
-window.initCanvasEvents = (canvasId, dotNetHelper) => {
-    const canvas = document.getElementById(canvasId);
-    const scale = 5;
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-
-    canvas.onmousedown = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = toMeters(e.clientX - rect.left, centerX, scale);
-        const mouseY = -toMeters(e.clientY - rect.top, centerY, scale);
-
-        dotNetHelper.invokeMethodAsync('HandleMouseDown', mouseX, mouseY);
-    };
-
-    canvas.onmousemove = (e) => {
-        if (e.buttons !== 1) return;
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = toMeters(e.clientX - rect.left, centerX, scale);
-        const mouseY = -toMeters(e.clientY - rect.top, centerY, scale);
-
-        dotNetHelper.invokeMethodAsync('HandleMouseMove', mouseX, mouseY);
-    };
-
-    canvas.oncontextmenu = (e) => {
-        e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = toMeters(e.clientX - rect.left, centerX, scale);
-        const mouseY = -toMeters(e.clientY - rect.top, centerY, scale);
-
-        dotNetHelper.invokeMethodAsync('HandleRightClick', mouseX, mouseY);
-    };
 };

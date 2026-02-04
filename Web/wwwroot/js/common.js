@@ -8,49 +8,51 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    const ensureSizeAndOrigin = () => {
-        const displayWidth = canvas.clientWidth;
-        const displayHeight = canvas.clientHeight;
+    const updateSizeAndScale = (width, height) => {
+        canvas.width = width;
+        canvas.height = height;
+        const visibleWorldWidth = 220.0;
+        window.gameCanvas.scale = width / visibleWorldWidth;
 
-        if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-            canvas.width = displayWidth;
-            canvas.height = displayHeight;
-            window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
-        }
-
-        if (!window.gameCanvas.origins[canvasId]) {
-            window.gameCanvas.origins[canvasId] = { x: canvas.width / 2, y: canvas.height / 2 };
+        if (!window.gameCanvas.setTargetMode[canvasId]) {
+            window.gameCanvas.origins[canvasId] = { x: width / 2, y: height / 2 };
         }
     };
 
-    ensureSizeAndOrigin();
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const width = entry.contentRect ? entry.contentRect.width : canvas.clientWidth;
+            const height = entry.contentRect ? entry.contentRect.height : canvas.clientHeight;
 
-    let resizeTimeout;
-    const onResize = () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-            ensureSizeAndOrigin();
-            try { dotNetRef.invokeMethodAsync('Redraw'); } catch (e) { }
-        }, 20);
-    };
-    window.addEventListener('resize', onResize);
+            if (width > 0 && height > 0) {
+                updateSizeAndScale(width, height);
+                try { dotNetRef.invokeMethodAsync('Redraw'); } catch (e) { }
+            }
+        }
+    });
 
-    canvas._cleanupResize = () => window.removeEventListener('resize', onResize);
-
-    const scale = window.gameCanvas.scale;
+    resizeObserver.observe(canvas);
+    canvas._cleanupResize = () => resizeObserver.disconnect();
+    updateSizeAndScale(canvas.clientWidth, canvas.clientHeight);
 
     const toWorld = (clientX, clientY) => {
         const rect = canvas.getBoundingClientRect();
-        const origin = window.gameCanvas.origins[canvasId] || { x: canvas.width / 2, y: canvas.height / 2 };
+
+        const visibleWorldWidth = 220.0;
+        const currentScale = rect.width / visibleWorldWidth;
+
+        const origin = window.gameCanvas.origins[canvasId] || { x: rect.width / 2, y: rect.height / 2 };
+
         const canvasX = clientX - rect.left;
         const canvasY = clientY - rect.top;
-        const wx = (canvasX - origin.x) / scale;
-        const wy = -(canvasY - origin.y) / scale;
+
+        const wx = (canvasX - origin.x) / currentScale;
+        const wy = -(canvasY - origin.y) / currentScale;
+
         return { worldX: wx, worldY: wy, canvasX, canvasY };
     };
 
     canvas.onmousedown = (e) => {
-        const rect = canvas.getBoundingClientRect();
         const { worldX, worldY, canvasX, canvasY } = toWorld(e.clientX, e.clientY);
 
         if (window.gameCanvas.setTargetMode[canvasId]) {
@@ -68,6 +70,7 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
     };
 
     canvas.onmousemove = (e) => {
+        if (e.buttons === 0) return; 
         const { worldX, worldY } = toWorld(e.clientX, e.clientY);
         dotNetRef.invokeMethodAsync('HandleMouseMove', worldX, worldY);
     };
