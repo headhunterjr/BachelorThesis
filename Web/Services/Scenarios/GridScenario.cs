@@ -28,6 +28,7 @@ namespace Web.Services.Scenarios
         // 3. Solver Tuning
         // How hard we penalize going below 0% or above 100% battery
         public double ConstraintWeight { get; set; } = 1000.0;
+        public int Horizon { get; set; } = 12;
 
         // --- DATA STORAGE ---
 
@@ -235,7 +236,7 @@ namespace Web.Services.Scenarios
 
             // We solve for a 24-hour horizon (assuming dt=1 hour for simplicity in this demo logic, 
             // or scaled appropriately). Let's say Horizon=48 steps (2 days)
-            var u = ILQR_Controller.Solve(state, 48, 10, dt, GetPhysicsModel(), this);
+            var u = ILQR_Controller.Solve(state, Horizon, 10, dt, GetPhysicsModel(), this);
 
             // Cost Accumulation for display
             double stepCost = Evaluate(state, u, dt, _currentStepIndex);
