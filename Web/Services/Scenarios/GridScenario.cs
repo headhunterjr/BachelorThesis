@@ -11,6 +11,8 @@ namespace Web.Services.Scenarios
         public bool HasGenerator { get; set; } = true;
         public bool HasSolar { get; set; } = true;
         public bool IsBlackout { get; set; } = false;
+        public bool IsCloudy { get; set; } = false;
+
         private List<GridRecord> _history = new();
 
         // --- CUSTOMIZABLE PARAMETERS ---
@@ -334,6 +336,36 @@ namespace Web.Services.Scenarios
 
         public void HandleInteraction(double x, double y, string mode)
         {
+            if (!string.IsNullOrEmpty(mode) && mode.StartsWith("SetSeason:"))
+            {
+                var season = mode.Substring("SetSeason:".Length);
+                if (season == "Spring" || season == "Summer" || season == "Autumn" || season == "Winter")
+                {
+                    Season = season;
+                    GenerateRandomDay();
+                    ApplySystemState();
+                }
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(mode) && mode.StartsWith("SetCloudy:"))
+            {
+                var val = mode.Substring("SetCloudy:".Length);
+                if (bool.TryParse(val, out var flag))
+                {
+                    IsCloudy = flag;
+                    ApplySystemState();
+                }
+                return;
+            }
+
+            if (mode == "ToggleCloudy")
+            {
+                IsCloudy = !IsCloudy;
+                ApplySystemState();
+                return;
+            }
+
             if (mode == "ToggleGen")
             {
                 HasGenerator = !HasGenerator;
@@ -345,13 +377,6 @@ namespace Web.Services.Scenarios
             if (mode == "ToggleBlackout")
             {
                 IsBlackout = !IsBlackout;
-            }
-
-            if (mode == "NextSeason")
-            {
-                Season = (Season == "Summer") ? "Winter" : "Summer";
-                // Only re-generate random noise on Season change or Reset
-                GenerateRandomDay();
             }
 
             // Always re-calculate the effective curves (Price/Solar) based on the new switches
@@ -390,7 +415,16 @@ namespace Web.Services.Scenarios
             _solar = new double[steps];
             _price = new double[steps];
 
-            double solarPeak = (Season == "Summer") ? 60.0 : 15.0;
+            double solarPeak = Season switch
+            {
+                "Summer" => 60.0,
+                "Spring" => 40.0,
+                "Autumn" => 25.0,
+                "Winter" => 15.0,
+                _ => 30.0
+            };
+
+            double cloudFactor = IsCloudy ? 0.40 : 1.0;
 
             for (int t = 0; t < steps; ++t)
             {
@@ -402,7 +436,7 @@ namespace Web.Services.Scenarios
                 // Solar is Base Shape * Peak * Toggle
                 if (HasSolar)
                 {
-                    _solar[t] = _baseSolar[t] * solarPeak;
+                    _solar[t] = _baseSolar[t] * solarPeak * cloudFactor;
                 }
                 else
                 {

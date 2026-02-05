@@ -44,14 +44,35 @@
                     <div class="control-group">
                         <label class="control-label">
                             <span>Пора року</span>
-                            <span class="control-value">@(Context.Season == "Summer" ? "Літо" : "Зима")</span>
+                            <span class="control-value">
+                                @(
+                                    Context.Season == "Summer" ? "Літо" :
+                                    Context.Season == "Winter" ? "Зима" :
+                                    Context.Season == "Spring" ? "Весна" : "Осінь")
+                            </span>
                         </label>
-                        <button class="btn btn-sm @(Context.Season == "Summer" ? "btn-warning" : "btn-info")"
-                                style="width: 100%"
-                                @onclick='() => ToggleConfig("NextSeason")'>
-                            Змінити пору року
-                        </button>
+
+                        <select class="form-control"
+                                value="@Context.Season"
+                                @onchange="OnSeasonChanged">
+                            <option value="Summer">Літо</option>
+                            <option value="Spring">Весна</option>
+                            <option value="Autumn">Осінь</option>
+                            <option value="Winter">Зима</option>
+                        </select>
                     </div>
+
+                    <div class="control-group" style="margin-top: 0.5rem;">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cloudySwitch"
+                                   @onchange="OnCloudyChanged"
+                                   checked="@(Context?.IsCloudy ?? false)" />
+                            <label class="form-check-label" for="cloudySwitch">
+                                Хмарний день
+                            </label>
+                        </div>
+                    </div>
+
 
                     <div class="control-group">
                         <label class="control-label">
@@ -129,9 +150,14 @@
                                @bind-value="Context.ConstraintWeight" @bind-value:event="oninput" />
                     </div>
 
+                </section>
+
+                <section class="control-section">
+                    <h3 class="section-title">Симуляція</h3>
+
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Горизонт планування (год)</span>
+                            <span>Горизонт</span>
                             <span class="control-value">@Context.Horizon</span>
                         </label>
                         <input type="range" class="form-range" min="1" max="24" step="1"
@@ -150,9 +176,8 @@
                             <option value="0.25">15 хвилин</option>
                         </select>
                     </div>
-
-
                 </section>
+
 
                 @if (_visuals != null)
                 {
@@ -213,6 +238,29 @@
             await UpdateVisuals();
         }
     }
+
+    private async Task OnSeasonChanged(ChangeEventArgs e)
+    {
+        if (_disposed) return;
+        var val = e?.Value?.ToString();
+        if (string.IsNullOrEmpty(val) || Context == null) return;
+
+        Sim.HandleInteraction(0, 0, $"SetSeason:{val}");
+        await UpdateVisuals();
+    }
+
+    private async Task OnCloudyChanged(ChangeEventArgs e)
+    {
+        if (_disposed || Context == null) return;
+
+        bool isChecked = false;
+        if (e?.Value is bool b) isChecked = b;
+        else if (e?.Value is string s) bool.TryParse(s, out isChecked);
+
+        Sim.HandleInteraction(0, 0, $"SetCloudy:{isChecked}");
+        await UpdateVisuals();
+    }
+
 
     private void ToggleSim()
     {
