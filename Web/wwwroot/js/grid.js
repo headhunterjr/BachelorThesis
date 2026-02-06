@@ -37,9 +37,12 @@
         ctx.fill();
     }
 
-    // PLANNED GENERATOR (dashed orange) - show up to currentStep or full if sim finished
+    // PLANNED GENERATOR (dashed orange)
     if (data.plannedGen) {
-        const visible = (data.currentStep >= steps) ? data.plannedGen.length : Math.min(data.currentStep, data.plannedGen.length);
+        // Fix: Use currentStep + 1 to include the current point in the line segment
+        const limit = data.currentStep >= (steps - 1) ? data.plannedGen.length : data.currentStep + 1;
+        const visible = Math.min(limit, data.plannedGen.length);
+
         ctx.strokeStyle = '#F97316';
         ctx.lineWidth = 2;
         ctx.setLineDash([3, 3]);
@@ -58,7 +61,10 @@
 
     // PLANNED GRID (blue)
     if (data.plannedGrid) {
-        const visible = (data.currentStep >= steps) ? data.plannedGrid.length : Math.min(data.currentStep, data.plannedGrid.length);
+        // Fix: Use currentStep + 1
+        const limit = data.currentStep >= (steps - 1) ? data.plannedGrid.length : data.currentStep + 1;
+        const visible = Math.min(limit, data.plannedGrid.length);
+
         ctx.strokeStyle = '#3B82F6';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -89,7 +95,10 @@
 
     // BATTERY (green)
     if (data.plannedBattery) {
-        const visible = (data.currentStep >= steps) ? data.plannedBattery.length : Math.min(data.currentStep, data.plannedBattery.length);
+        // Fix: Use currentStep + 1
+        const limit = data.currentStep >= (steps - 1) ? data.plannedBattery.length : data.currentStep + 1;
+        const visible = Math.min(limit, data.plannedBattery.length);
+
         ctx.strokeStyle = '#10B981';
         ctx.lineWidth = 3;
         ctx.shadowColor = '#10B981';
@@ -106,8 +115,8 @@
         ctx.shadowBlur = 0;
     }
 
-    // TIME INDICATOR (dashed vertical) - draw only while sim is running (currentStep < steps)
-    if (data.currentStep >= 0 && data.currentStep < steps) {
+    // TIME INDICATOR (dashed vertical)
+    if (data.currentStep >= 0 && data.currentStep < steps - 1) {
         const xNow = toX(data.currentStep);
         ctx.strokeStyle = '#F1F5F9';
         ctx.lineWidth = 1;
@@ -120,20 +129,27 @@
 
         ctx.fillStyle = '#F1F5F9';
         ctx.font = '10px Inter, sans-serif';
-        // compute hour relative to span (0..24)
-        const hour = ((data.currentStep / (steps - 1)) * 24);
-        const hourLabel = (Math.round(hour * 10) / 10).toFixed(1);
-        ctx.fillText(`${hourLabel}h`, xNow + 5, padding + 10);
+
+        // Fix: Calculate specific Hour and Minute for HH:MM format
+        const totalHours = (data.currentStep / (steps - 1)) * 24;
+        const h = Math.floor(totalHours);
+        const m = Math.round((totalHours - h) * 60);
+        // Format as 13:00 or 13:15
+        const timeLabel = `${h}:${m.toString().padStart(2, '0')}`;
+
+        ctx.fillText(timeLabel, xNow + 5, padding + 10);
     }
 
     // PRICE BARS across whole profile
     const barHeight = 10;
     const barY = startY + 15;
     if (data.priceProfile) {
-        for (let i = 0; i < data.priceProfile.length; i++) {
+        // Fix: Stop 1 step early. Profile points = N, Intervals = N-1.
+        // If we draw N bars, the last one overflows the chart.
+        for (let i = 0; i < data.priceProfile.length - 1; i++) {
             const price = data.priceProfile[i] || 0;
             const x = toX(i);
-            const w = (graphW / (steps - 1)) + 1;
+            const w = (graphW / (steps - 1)) + 1; // +1 to overlap gaps slightly
             let color = '#334155';
             if (price > 0.4) color = '#EF4444';
             if (price > 100) color = '#000000';

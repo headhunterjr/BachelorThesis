@@ -226,6 +226,7 @@
 /* Sub-sections within control sections */
 .sub-control-section {
     margin-top: 1.25rem;
+    margin-bottom: 1rem;
     padding: 1rem;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border);
@@ -235,13 +236,16 @@
     gap: 1.25rem;
 }
 
+.control-section .sub-control-section:last-child {
+    margin-bottom: 0;
+}
+
 /* Main Toggle Row (Label Left, Switch Right) */
 .toggle-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    margin-bottom: 0;
     min-height: 2rem;
 }
 
@@ -913,6 +917,10 @@
             max-width: none;
             min-width: 0;
         }
+
+    .control-buttons .btn-secondary {
+        margin-left: 0 !important;
+    }
 }
 
 
