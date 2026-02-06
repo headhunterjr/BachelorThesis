@@ -12,7 +12,7 @@
 <div class="visualizer-container">
     <div class="simulation-area">
         <div class="simulation-header">
-            <h1 class="simulation-title">Оптимізація використання електроенергії</h1>
+            <h1 class="simulation-title">Розумна Електромережа</h1>
         </div>
 
         <div class="canvas-wrapper">
@@ -24,7 +24,7 @@
                 <button class="btn @(_isRunning ? "btn-danger" : "btn-success")" @onclick="ToggleSim">
                     @(_isRunning ? "Стоп" : "Почати день")
                 </button>
-                <button class="btn btn-primary" @onclick="RunSingleStep">Крок (+@(Sim.Dt >= 1 ? $"{Sim.Dt:0.#} год" : $"{(int)(Sim.Dt * 60)} хв"))</button>
+                <button class="btn btn-primary" @onclick="RunSingleStep">Крок (+@Sim.Dt.ToString("0.##") год)</button>
                 <button class="btn btn-secondary" @onclick="Reset">Скинути</button>
             </div>
         </div>
@@ -42,37 +42,37 @@
                     <h3 class="section-title">Середовище</h3>
 
                     <div class="control-group">
-                        <label class="control-label">
-                            <span>Пора року</span>
-                            <span class="control-value">
-                                @(
-                                    Context.Season == "Summer" ? "Літо" :
-                                    Context.Season == "Winter" ? "Зима" :
-                                    Context.Season == "Spring" ? "Весна" : "Осінь")
-                            </span>
-                        </label>
-
-                        <select class="form-control"
-                                value="@Context.Season"
-                                @onchange="OnSeasonChanged">
-                            <option value="Summer">Літо</option>
-                            <option value="Spring">Весна</option>
-                            <option value="Autumn">Осінь</option>
-                            <option value="Winter">Зима</option>
+                        <label class="control-label">Пора року</label>
+                        <select class="form-control" @bind="Context.Season" @bind:after='() => ToggleConfig("SetSeason:" + Context.Season)'>
+                            <option value="Summer">Літо (Макс Сонця)</option>
+                            <option value="Spring">Весна (Багато Сонця)</option>
+                            <option value="Autumn">Осінь (Мало Сонця)</option>
+                            <option value="Winter">Зима (Мін Сонця)</option>
                         </select>
                     </div>
 
-                    <div class="control-group" style="margin-top: 0.5rem;">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="cloudySwitch"
-                                   @onchange="OnCloudyChanged"
-                                   checked="@(Context?.IsCloudy ?? false)" />
-                            <label class="form-check-label" for="cloudySwitch">
-                                Хмарний день
-                            </label>
-                        </div>
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Крок симуляції (dt)</span>
+                            <span class="control-value">@Sim.Dt.ToString("F3") год</span>
+                        </label>
+                        <select class="form-control" value="@Sim.Dt" @onchange="OnDtChanged">
+                            <option value="1.0">1 година</option>
+                            <option value="0.5">30 хвилин</option>
+                            <option value="0.3333333">20 хвилин</option>
+                            <option value="0.25">15 хвилин</option>
+                            <option value="0.1666667">10 хвилин</option>
+                        </select>
                     </div>
 
+                    <div class="toggle-row" style="margin-top: 1rem;">
+                        <label class="toggle-label" for="cloudSwitch">Хмарна погода</label>
+                        <div class="form-switch">
+                            <input class="form-check-input" type="checkbox" id="cloudSwitch"
+                                   checked="@Context.IsCloudy"
+                                   @onchange='() => ToggleConfig("ToggleCloudy")'>
+                        </div>
+                    </div>
 
                     <div class="control-group">
                         <label class="control-label">
@@ -81,11 +81,21 @@
                                 @(Context.IsBlackout ? "Блекаут" : "Онлайн")
                             </span>
                         </label>
-                        <button class="btn btn-sm btn-outline-danger"
-                                style="width: 100%"
+                        <button class="btn btn-sm btn-outline-danger" style="width: 100%"
                                 @onclick='() => ToggleConfig("ToggleBlackout")'>
-                            Симулювати блекаут
+                            @(Context.IsBlackout ? "Вимкнути блекаут" : "Симулювати блекаут")
                         </button>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Похибка прогнозу</span>
+                            <span class="control-value">@((Context.ForecastError * 100).ToString("F0"))%</span>
+                        </label>
+                        <input type="range" class="form-range" min="0.0" max="1.0" step="0.05"
+                               @bind-value="Context.ForecastError"
+                               @bind-value:event="oninput"
+                               @onmouseup='() => ToggleConfig("Refresh")' />
                     </div>
                 </section>
 
@@ -97,7 +107,8 @@
                             <span>Сонячні панелі</span>
                             <span class="control-value">@(Context.HasSolar ? "Готові" : "Не готові")</span>
                         </label>
-                        <button class="btn btn-sm btn-secondary" style="width: 100%" @onclick='() => ToggleConfig("ToggleSolar")'>
+                        <button class="btn btn-sm btn-secondary" style="width: 100%"
+                                @onclick='() => ToggleConfig("ToggleSolar")'>
                             @(Context.HasSolar ? "Вимкнути панелі" : "Увімкнути панелі")
                         </button>
                     </div>
@@ -107,101 +118,132 @@
                             <span>Дизель-генератор</span>
                             <span class="control-value">@(Context.HasGenerator ? "Готовий" : "Не готові")</span>
                         </label>
-                        <button class="btn btn-sm btn-secondary" style="width: 100%" @onclick='() => ToggleConfig("ToggleGen")'>
+                        <button class="btn btn-sm btn-secondary" style="width: 100%"
+                                @onclick='() => ToggleConfig("ToggleGen")'>
                             @(Context.HasGenerator ? "Вимкнути генератор" : "Увімкнути генератор")
                         </button>
                     </div>
-                </section>
 
-                <section class="control-section">
-                    <h3 class="section-title">Характеристики мережі</h3>
 
                     <div class="control-group">
-                        <label class="control-label">Ємність акумулятора (кВт·год)</label>
+                        <label class="control-label">Ємність батареї (кВт·год)</label>
                         <input type="number" class="form-control" step="10"
                                @bind-value="Context.BatteryCapacity" @bind-value:event="oninput" />
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Макс. потужність генератора (кВт)</label>
-                        <input type="number" class="form-control" step="5"
-                               @bind-value="Context.MaxGenPower" @bind-value:event="oninput" />
-                    </div>
-
-                    <div class="control-group">
-                        <label class="control-label">Ліміт мережі (кВт)</label>
-                        <input type="number" class="form-control" step="10"
-                               @bind-value="Context.MaxGridPower" @bind-value:event="oninput" />
+                        <label class="control-label">
+                            <span>Ефективність (ККД)</span>
+                            <span class="control-value">@((Context.BatteryEfficiency * 100).ToString("F0"))%</span>
+                        </label>
+                        <input type="range" class="form-range" min="0.0" max="1.0" step="0.01"
+                               @bind-value="Context.BatteryEfficiency" @bind-value:event="oninput" />
                     </div>
                 </section>
 
                 <section class="control-section">
-                    <h3 class="section-title">Економіка та налаштування</h3>
+                    <h3 class="section-title">Ринок та Стратегія</h3>
+
+                    <div class="sub-control-section">
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="peakSwitch">Піковий тариф</label>
+                            <div class="form-switch">
+                                <input class="form-check-input" type="checkbox" id="peakSwitch"
+                                       @bind="Context.UsePeakPricing"
+                                       @bind:after='() => ToggleConfig("Refresh")'>
+                            </div>
+                        </div>
+
+                        @if (Context.UsePeakPricing)
+                        {
+                            <div class="control-group">
+                                <label class="control-label">
+                                    <span>Ціна (День / Пік)</span>
+                                </label>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <input type="number" class="form-control" step="0.01" @bind="Context.BasePrice"
+                                           @bind:after='() => ToggleConfig("Refresh")' placeholder="Base" />
+                                    <input type="number" class="form-control" step="0.01" @bind="Context.PeakPrice"
+                                           @bind:after='() => ToggleConfig("Refresh")' placeholder="Peak" />
+                                </div>
+                            </div>
+
+                            <div class="control-group">
+                                <label class="control-label">Години пік</label>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-light);">
+                                    <input type="number" class="form-control" min="0" max="23" @bind="Context.PeakStartHour"
+                                           @bind:after='() => ToggleConfig("Refresh")' />
+                                    <span>до</span>
+                                    <input type="number" class="form-control" min="0" max="23" @bind="Context.PeakEndHour"
+                                           @bind:after='() => ToggleConfig("Refresh")' />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="control-group" style="margin-top: 1rem;">
+                        <label class="control-label">
+                            <span>Коефіцієнт продажу</span>
+                            <span class="control-value">@Context.SellPriceRatio.ToString("F2")</span>
+                        </label>
+                        <input type="range" class="form-range" min="0.0" max="1.0" step="0.1"
+                               @bind-value="Context.SellPriceRatio" @bind-value:event="oninput" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Згладжування (Анти-Пік)</span>
+                            <span class="control-value">@Context.GridSmoothing.ToString("F3")</span>
+                        </label>
+                        <input type="range" class="form-range" min="0.0" max="0.2" step="0.005"
+                               @bind-value="Context.GridSmoothing" @bind-value:event="oninput" />
+                        <div style="font-size: 0.7rem; color: var(--text-lighter); margin-top: 0.25rem;">
+                            Більше = плавніше, Менше = різкіше (економніше)
+                        </div>
+                    </div>
 
                     <div class="control-group">
                         <label class="control-label">Вартість пального ($/кВт·год)</label>
-                        <input type="number" class="form-control" step="0.05" min="0"
-                               @bind-value="Context.FuelCost" @bind-value:event="oninput" />
-                    </div>
-
-                    <div class="control-group">
-                        <label class="control-label">Жорсткість обмежень</label>
-                        <input type="number" class="form-control" step="100" min="100"
-                               @bind-value="Context.ConstraintWeight" @bind-value:event="oninput" />
-                    </div>
-
-                </section>
-
-                <section class="control-section">
-                    <h3 class="section-title">Симуляція</h3>
-
-                    <div class="control-group">
-                        <label class="control-label">
-                            <span>Горизонт</span>
-                            <span class="control-value">@Context.Horizon</span>
-                        </label>
-                        <input type="range" class="form-range" min="1" max="24" step="1"
-                               @bind-value="Context.Horizon" @bind-value:event="oninput" />
+                        <input type="number" class="form-control" step="0.01" min="0"
+                               @bind-value="Context.FuelCost" @bind-value:event="oninput"
+                               @onchange='() => ToggleConfig("Refresh")' />
                     </div>
 
                     <div class="control-group">
                         <label class="control-label">
-                            <span>Крок часу (dt)</span>
-                            <span class="control-value">@Sim.Dt.ToString("F3")</span>
+                            <span>Початковий заряд</span>
+                            <span class="control-value">@Context.InitialBatteryPercent.ToString("F0")%</span>
                         </label>
-
-                        <select class="form-control" @bind="Sim.Dt">
-                            <option value="1">1 година</option>
-                            <option value="0.5">30 хвилин</option>
-                            <option value="0.25">15 хвилин</option>
-                        </select>
+                        <input type="range" class="form-range" min="0" max="100" step="10"
+                               @bind-value="Context.InitialBatteryPercent" @bind-value:event="oninput" />
                     </div>
                 </section>
-
 
                 @if (_visuals != null)
                 {
                     <div class="telemetry-panel">
-                        <h3 class="telemetry-title">Результати прогнозу</h3>
+                        <h3 class="telemetry-title">Результати</h3>
                         <div class="telemetry-grid">
                             <div class="telemetry-item">
                                 <div class="telemetry-label">Час</div>
                                 <div class="telemetry-value">@((_visuals.CurrentStep * Sim.Dt).ToString("F1")) год</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Акумулятор</div>
-                                <div class="telemetry-value">@(_visuals.PlannedBattery[_visuals.CurrentStep > 0 ? _visuals.CurrentStep - 1 : 0].ToString("F1")) кВт·год</div>
+                                <div class="telemetry-label">Заряд</div>
+                                <div class="telemetry-value">@(_visuals.PlannedBattery.ElementAtOrDefault(_visuals.CurrentStep > 0 ? _visuals.CurrentStep - 1 : 0).ToString("F1")) кВт</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Вартість</div>
-                                <div class="telemetry-value" style="grid-column: span 2;">$@(_visuals.CurrentCost.ToString("F2"))</div>
+                                <div class="telemetry-label">Баланс</div>
+                                <div class="telemetry-value" style="color: @(_visuals.CurrentCost > 0 ? "#F59E0B" : "#10B981")">
+                                    $@(_visuals.CurrentCost.ToString("F2"))
+                                </div>
                             </div>
                         </div>
                     </div>
                 }
 
                 <section class="control-section">
-                    <h3 class="section-title">Експорт Даних</h3>
+                    <h3 class="section-title">Експорт</h3>
                     <div class="control-group">
                         <button class="btn btn-sm btn-outline-primary" style="width: 100%" @onclick="DownloadData">
                             Завантажити результати (.csv)
@@ -218,7 +260,6 @@
     private GridVisuals? _visuals;
     private Timer? _timer;
     private bool _isRunning = false;
-
     private bool _disposed = false;
 
     private GridScenario? Context => Sim.ActiveScenario as GridScenario;
@@ -226,7 +267,6 @@
     protected override async Task OnInitializedAsync()
     {
         Sim.LoadScenario("grid");
-        Sim.Dt = 1.0;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -239,56 +279,30 @@
         }
     }
 
-    private async Task OnSeasonChanged(ChangeEventArgs e)
+    private async Task ToggleSim()
     {
-        if (_disposed) return;
-        var val = e?.Value?.ToString();
-        if (string.IsNullOrEmpty(val) || Context == null) return;
-
-        Sim.HandleInteraction(0, 0, $"SetSeason:{val}");
-        await UpdateVisuals();
+        if (_isRunning) Stop();
+        else await Start();
     }
 
-    private async Task OnCloudyChanged(ChangeEventArgs e)
+    private async Task Start()
     {
-        if (_disposed || Context == null) return;
+        if (_timer != null || _disposed || Context == null) return;
 
-        bool isChecked = false;
-        if (e?.Value is bool b) isChecked = b;
-        else if (e?.Value is string s) bool.TryParse(s, out isChecked);
-
-        Sim.HandleInteraction(0, 0, $"SetCloudy:{isChecked}");
-        await UpdateVisuals();
-    }
-
-
-    private void ToggleSim()
-    {
-        if (_isRunning)
+        // If already finished, reset first so Start always restarts
+        if (_visuals != null && (_visuals.CurrentStep * Sim.Dt) >= 24.0)
         {
-            Stop();
-        }
-        else
-        {
-            Start();
-        }
-    }
-
-    private void Start()
-    {
-        if (_timer != null || _disposed)
-        {
-            return;
+            await Reset();
         }
 
-        _timer = new Timer(200);
+        double dtForTimer = Math.Max(0.01, Sim.Dt);
+        int tickSpeed = (int)(500 * dtForTimer);
+        if (tickSpeed < 50) tickSpeed = 50;
+
+        _timer = new Timer(tickSpeed);
         _timer.Elapsed += async (s, e) =>
         {
-            if (_disposed)
-            {
-                Stop();
-                return;
-            }
+            if (_disposed) { Stop(); return; }
             await InvokeAsync(async () => await Tick());
         };
         _timer.Start();
@@ -304,38 +318,58 @@
 
     private async Task Tick()
     {
-        if (_disposed) return;
+        if (_disposed || Context == null) return;
 
         Sim.RunStep();
         await UpdateVisuals();
-        if (_visuals != null && _visuals.CurrentStep >= _visuals.DemandProfile.Length)
+
+        double currentHour = _visuals.CurrentStep * Sim.Dt;
+        if (currentHour >= 24.0)
         {
             Stop();
-            if (!_disposed) 
-            {
-                StateHasChanged();
-            }
+            if (!_disposed) StateHasChanged();
         }
     }
 
     private async Task RunSingleStep()
     {
+        // If sim was finished, reset before running a single step so single-step can restart
+        if (_visuals != null && (_visuals.CurrentStep * Sim.Dt) >= 24.0)
+        {
+            await Reset();
+        }
+
         Stop();
         await Tick();
     }
 
-    private async Task ToggleConfig(string mode)
+    private async Task OnDtChanged(ChangeEventArgs e)
     {
-        Sim.HandleInteraction(0, 0, mode);
+        if (_disposed) return;
+        if (e?.Value == null) return;
+
+        if (double.TryParse(e.Value.ToString(), out var newDt) && newDt > 0)
+        {
+            Sim.Dt = newDt;
+
+            // tell the scenario to regenerate at the new profile resolution
+            Sim.HandleInteraction(0, 0, $"SetDt:{newDt}");
+
+            await UpdateVisuals();
+        }
+    }
+
+    private async Task ToggleConfig(string? mode)
+    {
+        if (mode != null) Sim.HandleInteraction(0, 0, mode);
+        else Sim.HandleInteraction(0, 0, "Refresh");
+
         await UpdateVisuals();
     }
 
     private async Task Reset()
     {
-        if (_disposed) 
-        {
-            return;
-        }
+        if (_disposed) return;
         Stop();
         Sim.Reset();
         await UpdateVisuals();
@@ -343,10 +377,7 @@
 
     private async Task DownloadData()
     {
-        if (Context == null || _disposed) 
-        {
-            return;
-        }
+        if (Context == null || _disposed) return;
         string csv = Context.GetCsv();
         string fileName = $"grid_data_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
         await JS.InvokeVoidAsync("downloadCsv", fileName, csv);
@@ -354,35 +385,16 @@
 
     private async Task UpdateVisuals()
     {
-        if (_disposed) 
-        {
-            return;
-        }
-
+        if (_disposed) return;
         _visuals = Sim.GetCurrentVisuals() as GridVisuals;
-
         if (_visuals != null && !_disposed)
         {
-            try
-            {
-                await JS.InvokeVoidAsync("drawGrid", "gridCanvas", _visuals);
-            }
-            catch { }
+            try { await JS.InvokeVoidAsync("drawGrid", "gridCanvas", _visuals); } catch { }
         }
-
-        if (!_disposed)
-        {
-            StateHasChanged();
-        }
+        if (!_disposed) StateHasChanged();
     }
 
-    [JSInvokable]
-    public async Task Redraw()
-    {
-        await UpdateVisuals();
-    }
-
-    // Required by common.js
+    [JSInvokable] public async Task Redraw() => await UpdateVisuals();
     [JSInvokable] public void HandleMouseDown(double x, double y) { }
     [JSInvokable] public void HandleMouseMove(double x, double y) { }
     [JSInvokable] public void HandleMouseUp() { }
@@ -392,11 +404,7 @@
     {
         _disposed = true;
         Stop();
-        try 
-        { 
-            ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "gridCanvas"); 
-        } 
-        catch { }
+        try { ((IJSInProcessRuntime)JS).InvokeVoid("disposeCanvasEvents", "gridCanvas"); } catch { }
         _objRef?.Dispose();
     }
 }

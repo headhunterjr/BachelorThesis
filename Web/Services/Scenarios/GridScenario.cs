@@ -7,184 +7,180 @@ namespace Web.Services.Scenarios
     public class GridScenario : ISimulationScenario, ICostModel
     {
         // --- CONFIGURATION ---
-        public string Season { get; set; } = "Summer"; // "Summer", "Winter"
+        public string Season { get; set; } = "Summer"; // Summer, Spring, Autumn, Winter
         public bool HasGenerator { get; set; } = true;
         public bool HasSolar { get; set; } = true;
         public bool IsBlackout { get; set; } = false;
+        public bool UsePeakPricing { get; set; } = true;
         public bool IsCloudy { get; set; } = false;
 
-        private List<GridRecord> _history = new();
-
         // --- CUSTOMIZABLE PARAMETERS ---
+        public double BatteryCapacity { get; set; } = 100.0;
+        public double MaxGenPower { get; set; } = 50.0;
+        public double MaxGridPower { get; set; } = 100.0;
+        public double BatteryEfficiency { get; set; } = 1.0; // kept linear & consistent with linearization
 
-        // 1. System Specifications (Physical Limits)
-        // Converted from private fields to public properties for the UI
-        public double BatteryCapacity { get; set; } = 100.0; // kWh
-        public double MaxGenPower { get; set; } = 50.0;      // kW
-        public double MaxGridPower { get; set; } = 100.0;    // kW
-
-        // 2. Economics (Costs)
-        // Cost of Diesel per kWh produced
         public double FuelCost { get; set; } = 0.40;
+        public double BasePrice { get; set; } = 0.10;
+        public double PeakPrice { get; set; } = 0.50;
+        public int PeakStartHour { get; set; } = 17;
+        public int PeakEndHour { get; set; } = 21;
+        public double SellPriceRatio { get; set; } = 0.5; // not used for execution (we disallow negative grid execution)
 
-        // 3. Solver Tuning
-        // How hard we penalize going below 0% or above 100% battery
         public double ConstraintWeight { get; set; } = 1000.0;
         public int Horizon { get; set; } = 12;
+        public double InitialBatteryPercent { get; set; } = 50.0;
+        public double ForecastError { get; set; } = 0.20;
+        public double GridSmoothing { get; set; } = 0.05;
 
-        // --- DATA STORAGE ---
+        // --- INTERNAL STATE ---
+        private List<GridRecord> _history = new();
 
-        // 1. Base Data (The "Random" part - preserves shape when toggling switches)
-        private double[] _baseDemand;
-        private double[] _baseSolar;  // Normalized 0.0 to 1.0 solar curve
-
-        // 2. Active Profiles (The "Effective" part - sent to Solver/Visuals)
-        private double[] _demand;
-        private double[] _solar;
-        private double[] _price;
-
-        // 3. Simulation History
-        // Store the last plan for visualization
         private List<double> _batteryHistory = new();
         private List<double> _gridHistory = new();
         private List<double> _genHistory = new();
 
-        private double _accumulatedCost = 0;
+        // Base arrays (shape + noise)
+        private double[] _baseDemand;
+        private double[] _baseSolarShape;
+        private double[] _baseSolarNoise;
+
+        // Active profiles (effective)
+        private double[] _demand;
+        private double[] _actualSolar;
+        private double[] _forecastSolar;
+        private double[] _price;
+
+        private bool _useForecast = false;
+        private double _accumulatedFinancialCost = 0;
         private int _currentStepIndex = 0;
+
+        // profile resolution used for generating arrays (set when dt changes)
+        private double _profileDt = 1.0;
 
         public GridScenario()
         {
-            GenerateRandomDay(); // Create the random noise once
-            ApplySystemState();  // Apply the initial settings (Summer, No Blackout, etc)
-
-            // Initial history state
-            _batteryHistory.Add(50.0); // Start at 50%
-            _gridHistory.Add(0.0);
-            _genHistory.Add(0.0);
+            GenerateEnvironment();
+            ResetHistory();
         }
 
         public void Reset()
         {
-            GenerateRandomDay(); // New random seed on reset
-            ApplySystemState();
+            GenerateEnvironment();
+            ResetHistory();
+        }
 
+        private void ResetHistory()
+        {
+            _history.Clear();
             _batteryHistory.Clear();
-            _batteryHistory.Add(50.0);
-
             _gridHistory.Clear();
-            _gridHistory.Add(0.0);
-
             _genHistory.Clear();
+
+            double startEnergy = BatteryCapacity * (InitialBatteryPercent / 100.0);
+            _batteryHistory.Add(startEnergy);
+            _gridHistory.Add(0.0);
             _genHistory.Add(0.0);
 
-            _history.Clear();
-
-            _accumulatedCost = 0;
+            _accumulatedFinancialCost = 0;
             _currentStepIndex = 0;
         }
 
-        // --- PHYSICS MODEL (Time-Varying) ---
-        // State x[0]: Battery Energy (kWh)
-        // Control u[0]: Grid Power (kW)
-        // Control u[1]: Generator Power (kW)
+        // --- PHYSICS MODEL ---
         public PhysicsModel GetPhysicsModel()
         {
+            // Use consistent linear model so ILQR's linearization is stable.
             return new PhysicsModel(GridStep, GridLinearize, 1, 2);
         }
 
-        // Exact Physics: E_next = E_now + (P_in - P_out) * dt
         private double[] GridStep(double[] x, double[] u, double dt, int t)
         {
-            // Clamp t to horizon to avoid crash if solver looks past profile
+            if (_demand == null || _actualSolar == null) return x;
+
             int safeT = Math.Min(t, _demand.Length - 1);
 
-            double currentE = x[0];
-            double grid = u[0];
-            double gen = u[1];
-
-            // Use the ACTIVE profiles
-            double solar = _solar[safeT]; // Was HasSolar ? ... now handled in ApplySystemState
+            double solar = _useForecast ? _forecastSolar[safeT] : _actualSolar[safeT];
             double demand = _demand[safeT];
 
-            // Power Balance:
-            // Net Flow into Battery = Sources - Loads
-            // If Net Flow is positive, battery charges. Negative, it drains.
-            double netPower = grid + gen + solar - demand;
+            double currentE = x[0];
+            double gridP = u.ElementAtOrDefault(0);
+            double genP = u.ElementAtOrDefault(1);
 
-            double nextE = currentE + netPower * dt;
+            // Net flow into battery: sources - demand
+            double netPower = gridP + genP + solar - demand;
+
+            // Apply a single linear efficiency factor (keeps linearization simple & predictable).
+            double eff = Math.Clamp(BatteryEfficiency, 0.0, 1.0);
+
+            double nextE = currentE + netPower * dt * eff;
+
+            // Only clamp in execution (when _useForecast == false)
+            if (!_useForecast)
+            {
+                if (nextE < 0) nextE = 0;
+                if (nextE > BatteryCapacity) nextE = BatteryCapacity;
+            }
 
             return new double[] { nextE };
         }
 
         private (double[,], double[,]) GridLinearize(double[] x, double[] u, double dt, int t)
         {
-            // System is Linear: x_next = 1*x + dt*u_grid + dt*u_gen + dt*(Solar-Demand)
-            // A = [1]
-            // B = [dt, dt]
-            // The disturbance (Solar-Demand) is constant w.r.t x and u, so it disappears in linearization.
+            // Linearized model consistent with GridStep:
+            // x_next = 1*x + dt*eff * [1, 1] * u + dt*eff*(solar - demand) (disturbance)
+            double eff = Math.Clamp(BatteryEfficiency, 0.0, 1.0);
 
             double[,] A = { { 1.0 } };
-            double[,] B = { { dt, dt } };
+            double[,] B = { { dt * eff, dt * eff } };
             return (A, B);
         }
 
         // --- COST MODEL ---
         public double Evaluate(double[] x, double[] u, double dt, int t)
         {
+            if (_price == null) return 0;
             int safeT = Math.Min(t, _demand.Length - 1);
-
-            double gridP = u[0];
-            double genP = u[1];
-
-            // Use ACTIVE price (which reflects Blackout state)
             double price = _price[safeT];
+
+            double gridP = u.ElementAtOrDefault(0);
+            double genP = u.ElementAtOrDefault(1);
+            double E = x[0];
 
             double cost = 0;
 
-            // 1. Economic Cost
-            cost += gridP * price * dt;     // Money spent on grid
-            cost += genP * FuelCost * dt;   // Diesel cost (Customizable)
+            // Linear economic cost (simple and consistent)
+            // We treat gridP as positive = import. For the solver, negative grid will be penalized heavily below.
+            cost += gridP * price * dt;
+            cost += genP * FuelCost * dt;
 
-            // 2. Constraints (Barriers)
-            // Battery Limits: 0 < E < Capacity
-            double E = x[0];
-            if (E < 0)
-            {
-                cost += ConstraintWeight * Math.Exp(-E); // Soft barrier below 0
-            }
+            // Quadratic smoothing on grid usage (to penalize spikes)
+            cost += GridSmoothing * gridP * gridP * dt;
 
-            if (E > BatteryCapacity)
-            {
-                cost += ConstraintWeight * Math.Exp(E - BatteryCapacity);
-            }
+            // Soft-box constraints for battery
+            if (E < 0) cost += ConstraintWeight * Math.Exp(-E);
+            if (E > BatteryCapacity) cost += ConstraintWeight * Math.Exp(E - BatteryCapacity);
 
-            // Generator Limits: 0 < Gen < Max
-            if (genP < 0)
-            {
-                cost += (ConstraintWeight * 10) * genP * genP; // No reverse generator
-            }
-            if (genP > MaxGenPower)
-            {
-                cost += (ConstraintWeight / 10.0) * Math.Pow(genP - MaxGenPower, 2);
-            }
+            // Generator constraints
+            if (genP < 0) cost += (ConstraintWeight * 10) * genP * genP;
+            if (genP > MaxGenPower) cost += (ConstraintWeight / 10.0) * Math.Pow(genP - MaxGenPower, 2);
+            if (!HasGenerator) cost += ConstraintWeight * 100.0 * genP * genP;
 
-            // Generator existence check
-            // Use quadratic penalty (u^2) instead of constant step so solver feels the slope
-            if (!HasGenerator)
-            {
-                cost += ConstraintWeight * 100.0 * genP * genP;
-            }
-
-            // Grid Limits (Capacity)
+            // Grid constraints / blackout
             if (IsBlackout)
             {
-                // In blackout, Grid Power > 0 is heavily penalized
-                // But we allow 0 (floating), so penalize usage magnitude
+                // In blackout, using grid is heavily penalized (we also clamp execution to 0)
                 cost += ConstraintWeight * 100.0 * gridP * gridP;
             }
-            if (Math.Abs(gridP) > MaxGridPower)
+            else if (Math.Abs(gridP) > MaxGridPower)
             {
                 cost += (ConstraintWeight / 10.0) * Math.Pow(Math.Abs(gridP) - MaxGridPower, 2);
+            }
+
+            // Discourage negative grid (selling) in planning unless you explicitly want it;
+            // this is an extra soft penalty so solver won't plan to sell which we don't execute.
+            if (gridP < 0)
+            {
+                cost += ConstraintWeight * 100.0 * gridP * gridP;
             }
 
             return cost;
@@ -192,269 +188,299 @@ namespace Web.Services.Scenarios
 
         public void GetDerivatives(double[] x, double[] u, double dt, int t, ref double[,] Q, ref double[,] R, ref double[] q, ref double[] r)
         {
+            if (_price == null) return;
             int safeT = Math.Min(t, _demand.Length - 1);
             double price = _price[safeT];
-            double genP = u[1];
-            double gridP = u[0];
+            double gridP = u.ElementAtOrDefault(0);
+            double genP = u.ElementAtOrDefault(1);
 
-            // Gradients
-            // r[0] (Grid) = Price * dt
-            r[0] = price * dt;
-            // r[1] (Gen) = Fuel * dt
-            r[1] = FuelCost * dt;
+            // Linear gradients matching Evaluate
+            r[0] = price * dt; // grid marginal cost
+            r[1] = FuelCost * dt; // generator marginal cost
 
-            // Hessians (Regularization)
-            Q[0, 0] = 0.1; // Fix from previous context: Battery Center Attraction
-            R[0, 0] = 0.01;
-            R[1, 1] = 0.01;
+            // Hessians (regularization)
+            double smoothingHessian = GridSmoothing * 2.0 * dt;
+            Q[0, 0] = 0.1; // small battery center attraction
+            R[0, 0] = 0.001 + smoothingHessian; // grid control curvature
+            R[1, 1] = 0.001; // gen control curvature
 
-            // Add derivatives for disabled generator
-            if (!HasGenerator)
-            {
-                double K = ConstraintWeight * 100.0;
-                r[1] += 2 * K * genP;
-                R[1, 1] += 2 * K;
-            }
+            if (!HasGenerator) R[1, 1] += 2 * ConstraintWeight * 100.0;
+            if (IsBlackout) R[0, 0] += 2 * ConstraintWeight * 100.0;
 
-            // Add derivatives for Blackout
-            if (IsBlackout)
-            {
-                double K = ConstraintWeight * 100.0;
-                r[0] += 2 * K * gridP;
-                R[0, 0] += 2 * K;
-            }
-
-            // Battery Center Attraction (keeps it away from 0/100 bounds gently)
-            // This approximates the barrier gradient
+            // battery attraction toward middle
             double target = BatteryCapacity / 2.0;
-            double err = x[0] - target;
-            q[0] = 0.1 * err;
+            q[0] = 0.1 * (x[0] - target);
         }
 
-        // --- EXECUTION ---
+        // --- SIMULATION STEP ---
         public BaseStateDTO RunStep(double dt, double[] currentState)
         {
-            var state = currentState != null && currentState.Length == 1 ? currentState : new double[] { 50.0 };
+            // If dt changed externally, regenerate environment arrays to the new resolution
+            if (Math.Abs(dt - _profileDt) > 1e-9)
+            {
+                _profileDt = dt > 0 ? dt : 1.0;
+                GenerateEnvironment();
+            }
 
-            // We solve for a 24-hour horizon (assuming dt=1 hour for simplicity in this demo logic, 
-            // or scaled appropriately). Let's say Horizon=48 steps (2 days)
-            var u = ILQR_Controller.Solve(state, Horizon, 10, dt, GetPhysicsModel(), this);
+            double actualDt = dt;
+            double startEnergy = BatteryCapacity * (InitialBatteryPercent / 100.0);
+            var state = currentState != null && currentState.Length == 1 ? currentState : new double[] { startEnergy };
 
-            // Cost Accumulation for display
-            double stepCost = Evaluate(state, u, dt, _currentStepIndex);
-            _accumulatedCost += stepCost;
+            // 1) Plan using forecast
+            _useForecast = true;
+            var plannedU = ILQR_Controller.Solve(state, Horizon, 10, actualDt, GetPhysicsModel(), this);
 
-            // NOTE: We don't have access to the full trajectory from Solve() directly in the DTO return 
-            // without modifying ILQR return type. 
-            // BUT, for the "RunStep" simulation (advancing time), we only need the first input.
+            // 2) Convert planner output -> executed controls (apply physical limits, clamp negative grid)
+            double plannedGrid = plannedU.ElementAtOrDefault(0);
+            double plannedGen = plannedU.ElementAtOrDefault(1);
 
-            // Simulate one step forward to record history for the graph
-            var nextState = GridStep(state, u, dt, _currentStepIndex);
+            // Execution clamping
+            double execGrid = plannedGrid;
+            // We disallow negative imports (no selling) in execution: clamp to >= 0
+            execGrid = Math.Max(0.0, execGrid);
+            if (IsBlackout) execGrid = 0.0; // no import allowed in blackout (penalized heavily)
+            execGrid = Math.Min(execGrid, MaxGridPower);
 
-            // --- NEW: Record History ---
+            double execGen = plannedGen;
+            if (!HasGenerator) execGen = 0.0;
+            execGen = Math.Max(0.0, execGen);
+            execGen = Math.Min(execGen, MaxGenPower);
+
+            var executedU = new double[] { execGrid, execGen };
+
+            // 3) Execute using actual solar & physics
+            _useForecast = false;
+            var nextState = GridStep(state, executedU, actualDt, _currentStepIndex);
+
+            // 4) Bookkeeping: compute real costs based on executed controls
             int safeT = Math.Min(_currentStepIndex, _demand.Length - 1);
+            double realGridCost = execGrid * _price[safeT] * actualDt;
+            double realGenCost = execGen * FuelCost * actualDt;
+            double stepFinancialCost = realGridCost + realGenCost;
+            _accumulatedFinancialCost += stepFinancialCost;
+
+            // 5) Save history (record executed values)
             _history.Add(new GridRecord(
-                _currentStepIndex * dt, // "Hour" approx
+                _currentStepIndex * actualDt,
                 _demand[safeT],
-                _solar[safeT],
+                _actualSolar[safeT],
                 _price[safeT],
                 state[0],
-                u[0],
-                u[1],
-                stepCost
+                execGrid,
+                execGen,
+                stepFinancialCost
             ));
 
             _currentStepIndex++;
 
-            // Append histories if we haven't already for this step
             if (_batteryHistory.Count <= _currentStepIndex)
             {
                 _batteryHistory.Add(nextState[0]);
-                _gridHistory.Add(u[0]);
-                _genHistory.Add(u[1]);
+                _gridHistory.Add(execGrid);
+                _genHistory.Add(execGen);
             }
 
-            // However, to Visualize the plan, we will re-simulate locally:
-            return new GridStateDTO
-            {
-                State = state,
-                Control = u
-            };
+            // Return the planned state/control to the caller (for display or further processing).
+            // Note: visuals / csv / histories reflect the executed values.
+            return new GridStateDTO { State = nextState, Control = plannedU };
         }
 
+        // --- CSV EXPORT ---
         public string GetCsv()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Hour,Demand,Solar,Price,BatteryLevel,GridUsage,GenUsage,StepCost");
+            sb.AppendLine("Hour,Demand(kW),Solar(kW),Price($/kWh),Battery(kWh),Grid(kW),Gen(kW),StepCost($)");
             foreach (var r in _history)
             {
-                sb.AppendLine($"{r.Hour:F1},{r.Demand:F2},{r.Solar:F2},{r.Price:F2},{r.BatteryLevel:F2},{r.GridUsage:F2},{r.GenUsage:F2},{r.CurrentCost:F2}");
+                sb.AppendLine($"{r.Hour:F2},{r.Demand:F2},{r.Solar:F2},{r.Price:F2},{r.BatteryLevel:F2},{r.GridUsage:F2},{r.GenUsage:F2},{r.CurrentCost:F2}");
             }
             return sb.ToString();
         }
 
         public object GetVisualizationData()
         {
-            // For the graph, we want to show what the solver IS PLANNING.
-            // Since Solve() only returns u[0], we can't show the future plan exactly.
-            // To fix this properly, we'd change Solve() to return the whole path.
-            // For now, we will return the "World State" (Profiles).
+            int len = _demand.Length;
+            double[] histBat = new double[len];
+            double[] histGrid = new double[len];
+            double[] histGen = new double[len];
 
-            double[] historyArray = new double[_demand.Length];
-            double[] historyGrid = new double[_demand.Length];
-            double[] historyGen = new double[_demand.Length];
-
-            for (int i = 0; i < historyArray.Length; ++i)
+            for (int i = 0; i < len; ++i)
             {
                 if (i < _batteryHistory.Count)
                 {
-                    historyArray[i] = _batteryHistory[i];
-                    // Also populate grid/gen history, handling potential index mismatches gracefully
-                    if (i < _gridHistory.Count) historyGrid[i] = _gridHistory[i];
-                    if (i < _genHistory.Count) historyGen[i] = _genHistory[i];
+                    histBat[i] = _batteryHistory[i];
+                    if (i < _gridHistory.Count) histGrid[i] = _gridHistory[i];
+                    if (i < _genHistory.Count) histGen[i] = _genHistory[i];
                 }
                 else
                 {
-                    historyArray[i] = 0; // Future unknown in this simplified view
+                    histBat[i] = 0;
+                    histGrid[i] = 0;
+                    histGen[i] = 0;
                 }
             }
 
-            // Returns the ACTIVE profiles (_demand, _solar, _price) 
+            // CurrentStep is allowed to equal len (sim finished). JS will hide the dotted line when currentStep >= steps.
+            int reportedStep = _currentStepIndex;
+
             return new GridVisuals
             {
                 DemandProfile = _demand,
-                SolarProfile = _solar,
+                SolarProfile = _actualSolar,
                 PriceProfile = _price,
-                // Placeholder for battery plan until ILQR returns trajectory
-                PlannedBattery = historyArray,
-                PlannedGrid = historyGrid, // Passed to visualization
-                PlannedGen = historyGen,   // Passed to visualization
-                CurrentCost = _accumulatedCost,
-                CurrentStep = _currentStepIndex
+                PlannedBattery = histBat,
+                PlannedGrid = histGrid,
+                PlannedGen = histGen,
+                CurrentCost = _accumulatedFinancialCost,
+                CurrentStep = reportedStep
             };
         }
 
         public void HandleInteraction(double x, double y, string mode)
         {
-            if (!string.IsNullOrEmpty(mode) && mode.StartsWith("SetSeason:"))
+            if (string.IsNullOrEmpty(mode))
             {
-                var season = mode.Substring("SetSeason:".Length);
-                if (season == "Spring" || season == "Summer" || season == "Autumn" || season == "Winter")
-                {
-                    Season = season;
-                    GenerateRandomDay();
-                    ApplySystemState();
-                }
-                return;
+                // refresh / noop
             }
-
-            if (!string.IsNullOrEmpty(mode) && mode.StartsWith("SetCloudy:"))
+            else if (mode == "ToggleGen")
+            {
+                HasGenerator = !HasGenerator;
+            }
+            else if (mode == "ToggleSolar")
+            {
+                HasSolar = !HasSolar;
+            }
+            else if (mode == "ToggleBlackout")
+            {
+                IsBlackout = !IsBlackout;
+            }
+            else if (mode == "ToggleCloudy")
+            {
+                IsCloudy = !IsCloudy;
+            }
+            else if (mode.StartsWith("SetSeason:"))
+            {
+                var val = mode.Substring("SetSeason:".Length);
+                if (!string.IsNullOrEmpty(val))
+                {
+                    Season = val;
+                    GenerateEnvironment();
+                    return;
+                }
+            }
+            else if (mode.StartsWith("SetCloudy:"))
             {
                 var val = mode.Substring("SetCloudy:".Length);
                 if (bool.TryParse(val, out var flag))
                 {
                     IsCloudy = flag;
                     ApplySystemState();
+                    return;
                 }
-                return;
+            }
+            else if (mode.StartsWith("SetDt:") || mode.StartsWith("SetStepSize:"))
+            {
+                var prefix = mode.StartsWith("SetDt:") ? "SetDt:" : "SetStepSize:";
+                var val = mode.Substring(prefix.Length);
+                if (double.TryParse(val, out var d) && d > 0)
+                {
+                    _profileDt = d;
+                    GenerateEnvironment();
+                    return;
+                }
             }
 
-            if (mode == "ToggleCloudy")
+            // If profile resolution changed in other ways, ensure we re-generate or reapply
+            int expectedSteps = Math.Max(2, (int)(24.0 / _profileDt) + 1);
+            if (_baseDemand == null || _baseDemand.Length != expectedSteps)
             {
-                IsCloudy = !IsCloudy;
+                GenerateEnvironment();
+            }
+            else
+            {
                 ApplySystemState();
-                return;
             }
-
-            if (mode == "ToggleGen")
-            {
-                HasGenerator = !HasGenerator;
-            }
-            if (mode == "ToggleSolar")
-            {
-                HasSolar = !HasSolar;
-            }
-            if (mode == "ToggleBlackout")
-            {
-                IsBlackout = !IsBlackout;
-            }
-
-            // Always re-calculate the effective curves (Price/Solar) based on the new switches
-            ApplySystemState();
         }
 
-        // 1. Generate the "Random" part (Base Demand / Sun Shape)
-        private void GenerateRandomDay()
+        private void GenerateEnvironment()
         {
-            int steps = 50;
+            int steps = Math.Max(2, (int)(24.0 / _profileDt) + 1);
+
             _baseDemand = new double[steps];
-            _baseSolar = new double[steps];
-            _price = new double[steps]; // Will be overwritten by ApplySystemState, but size it here
+            _baseSolarShape = new double[steps];
+            _baseSolarNoise = new double[steps];
+            _demand = new double[steps];
+            _forecastSolar = new double[steps];
+            _actualSolar = new double[steps];
+            _price = new double[steps];
 
             Random rnd = new Random();
 
             for (int t = 0; t < steps; ++t)
             {
-                double hour = (t / (double)steps) * 24.0;
+                double hour = t * _profileDt;
 
-                // Base Demand: Peak at 19:00
-                _baseDemand[t] = 20.0 + 15.0 * Math.Exp(-Math.Pow(hour - 19, 2) / 10.0);
-                _baseDemand[t] += (rnd.NextDouble() - 0.5) * 5.0; // Noise
+                double demandCurve = 20.0 + 15.0 * Math.Exp(-Math.Pow(hour - 19, 2) / 10.0);
+                double noise = Math.Sin(hour * 0.8) * 2.0 + (rnd.NextDouble() - 0.5) * 3.0;
+                _baseDemand[t] = Math.Max(0, demandCurve + noise);
 
-                // Base Solar Shape: Normalized Bell curve (0.0 to 1.0) peaking at 12:00
-                _baseSolar[t] = Math.Exp(-Math.Pow(hour - 12, 2) / 10.0);
-                if (_baseSolar[t] < 0.01) _baseSolar[t] = 0;
+                double solarCurve = Math.Exp(-Math.Pow(hour - 12, 2) / 8.0);
+                if (solarCurve < 0.01) solarCurve = 0;
+                _baseSolarShape[t] = solarCurve;
+
+                _baseSolarNoise[t] = (rnd.NextDouble() - 0.5) * 2.0;
             }
+
+            ApplySystemState();
         }
 
-        // 2. Apply the "Switches" (Scale Solar, Set Prices)
         private void ApplySystemState()
         {
+            if (_baseDemand == null) return;
             int steps = _baseDemand.Length;
-            _demand = new double[steps];
-            _solar = new double[steps];
-            _price = new double[steps];
 
             double solarPeak = Season switch
             {
                 "Summer" => 60.0,
-                "Spring" => 40.0,
-                "Autumn" => 25.0,
+                "Spring" => 45.0,
+                "Autumn" => 30.0,
                 "Winter" => 15.0,
                 _ => 30.0
             };
 
-            double cloudFactor = IsCloudy ? 0.40 : 1.0;
+            if (IsCloudy) solarPeak *= 0.4;
 
             for (int t = 0; t < steps; ++t)
             {
-                double hour = (t / (double)steps) * 24.0;
+                double hour = t * _profileDt;
 
-                // Demand is constant unless we add modifiers later
                 _demand[t] = _baseDemand[t];
 
-                // Solar is Base Shape * Peak * Toggle
-                if (HasSolar)
+                if (!HasSolar)
                 {
-                    _solar[t] = _baseSolar[t] * solarPeak * cloudFactor;
+                    _forecastSolar[t] = 0;
+                    _actualSolar[t] = 0;
                 }
                 else
                 {
-                    _solar[t] = 0.0;
+                    double baseVal = _baseSolarShape[t] * solarPeak;
+                    _forecastSolar[t] = baseVal;
+
+                    double noise = _baseSolarNoise[t];
+                    double errorMag = solarPeak * ForecastError;
+                    _actualSolar[t] = Math.Max(0, baseVal + (noise * errorMag));
                 }
 
-                // Price Logic
                 if (IsBlackout)
                 {
-                    _price[t] = 1000.0; // Black/Red bar
+                    _price[t] = 1000.0;
                 }
                 else
                 {
-                    _price[t] = 0.10; // Base rate
-                    // Peak pricing 5pm - 9pm
-                    if (hour > 17 && hour < 21)
+                    _price[t] = BasePrice;
+                    if (UsePeakPricing && hour >= PeakStartHour && hour < PeakEndHour)
                     {
-                        _price[t] = 0.50; // Peak
+                        _price[t] = PeakPrice;
                     }
                 }
             }
