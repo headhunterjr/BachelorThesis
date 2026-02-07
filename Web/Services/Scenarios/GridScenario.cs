@@ -6,19 +6,17 @@ namespace Web.Services.Scenarios
 {
     public class GridScenario : ISimulationScenario, ICostModel
     {
-        // --- CONFIGURATION ---
-        public string Season { get; set; } = "Summer"; // Summer, Spring, Autumn, Winter
+        public string Season { get; set; } = "Summer";
         public bool HasGenerator { get; set; } = true;
         public bool HasSolar { get; set; } = true;
         public bool IsBlackout { get; set; } = false;
         public bool UsePeakPricing { get; set; } = true;
         public bool IsCloudy { get; set; } = false;
 
-        // --- CUSTOMIZABLE PARAMETERS ---
         public double BatteryCapacity { get; set; } = 100.0;
         public double MaxGenPower { get; set; } = 50.0;
         public double MaxGridPower { get; set; } = 100.0;
-        public double BatteryEfficiency { get; set; } = 1.0; // kept linear & consistent with linearization
+        public double BatteryEfficiency { get; set; } = 1.0;
 
         public double BatteryAttraction
         {
@@ -49,19 +47,16 @@ namespace Web.Services.Scenarios
         public double InitialBatteryPercent { get; set; } = 50.0;
         public double ForecastError { get; set; } = 0.0;
 
-        // --- INTERNAL STATE ---
         private List<GridRecord> _history = new();
 
         private List<double> _batteryHistory = new();
         private List<double> _gridHistory = new();
         private List<double> _genHistory = new();
 
-        // Base arrays (shape + noise)
         private double[] _baseDemand;
         private double[] _baseSolarShape;
         private double[] _baseSolarNoise;
 
-        // Active profiles (effective)
         private double[] _demand;
         private double[] _actualSolar;
         private double[] _forecastSolar;
@@ -112,10 +107,8 @@ namespace Web.Services.Scenarios
             _currentStepIndex = 0;
         }
 
-        // --- PHYSICS MODEL ---
         public PhysicsModel GetPhysicsModel()
         {
-            // Use consistent linear model so ILQR's linearization is stable.
             return new PhysicsModel(GridStep, GridLinearize, 1, 2);
         }
 
@@ -132,15 +125,12 @@ namespace Web.Services.Scenarios
             double gridP = u.ElementAtOrDefault(0);
             double genP = u.ElementAtOrDefault(1);
 
-            // Net flow into battery: sources - demand
             double netPower = gridP + genP + solar - demand;
 
-            // Apply a single linear efficiency factor (keeps linearization simple & predictable).
             double eff = Math.Clamp(BatteryEfficiency, 0.0, 1.0);
 
             double nextE = currentE + netPower * dt * eff;
 
-            // Only clamp in execution (when _useForecast == false)
             if (!_useForecast)
             {
                 if (nextE < 0) nextE = 0;
@@ -152,8 +142,6 @@ namespace Web.Services.Scenarios
 
         private (double[,], double[,]) GridLinearize(double[] x, double[] u, double dt, int t)
         {
-            // Linearized model consistent with GridStep:
-            // x_next = 1*x + dt*eff * [1, 1] * u + dt*eff*(solar - demand) (disturbance)
             double eff = Math.Clamp(BatteryEfficiency, 0.0, 1.0);
 
             double[,] A = { { 1.0 } };
@@ -161,7 +149,6 @@ namespace Web.Services.Scenarios
             return (A, B);
         }
 
-        // --- COST MODEL ---
         public double Evaluate(double[] x, double[] u, double dt, int t)
         {
             if (_price == null) return 0;
@@ -174,31 +161,23 @@ namespace Web.Services.Scenarios
 
             double cost = 0;
 
-            // Linear economic cost (simple and consistent)
-            // We treat gridP as positive = import.
             cost += gridP * price * dt;
             cost += genP * FuelCost * dt;
 
-            //cost += _R[0, 0] * gridP * gridP * dt;
-            //cost += _R[1, 1] * genP * genP * dt;
 
             double target = BatteryCapacity / 2.0;
             double dev = E - target;
             cost += _Q[0, 0] * dev * dev * dt;
 
-            // Soft-box constraints for battery
             if (E < 0) cost += ConstraintWeight * Math.Exp(-E);
             if (E > BatteryCapacity) cost += ConstraintWeight * Math.Exp(E - BatteryCapacity);
 
-            // Generator constraints
             if (genP < 0) cost += (ConstraintWeight * 10) * genP * genP;
             if (genP > MaxGenPower) cost += (ConstraintWeight / 10.0) * Math.Pow(genP - MaxGenPower, 2);
             if (!HasGenerator) cost += ConstraintWeight * 100.0 * genP * genP;
 
-            // Grid constraints / blackout
             if (IsBlackout)
             {
-                // In blackout, using grid is heavily penalized (we also clamp execution to 0)
                 cost += ConstraintWeight * 100.0 * gridP * gridP;
             }
             else if (Math.Abs(gridP) > MaxGridPower)
@@ -217,9 +196,8 @@ namespace Web.Services.Scenarios
             double gridP = u.ElementAtOrDefault(0);
             double genP = u.ElementAtOrDefault(1);
 
-            // Linear gradients matching Evaluate
-            r[0] = price * dt; // grid marginal cost
-            r[1] = FuelCost * dt; // generator marginal cost
+            r[0] = price * dt;
+            r[1] = FuelCost * dt;
 
             R[0, 0] = 2.0 * _R[0, 0];
             R[1, 1] = 2.0 * _R[1, 1];
@@ -227,19 +205,15 @@ namespace Web.Services.Scenarios
             double target = BatteryCapacity / 2.0;
             double dev = x[0] - target;
 
-            // Gradient: 2 * Q * dev
             q[0] = 2.0 * _Q[0, 0] * dev;
-            // Hessian: 2 * Q
             Q[0, 0] = 2.0 * _Q[0, 0];
 
             if (!HasGenerator) R[1, 1] += 2 * ConstraintWeight * 100.0;
             if (IsBlackout) R[0, 0] += 2 * ConstraintWeight * 100.0;
         }
 
-        // --- SIMULATION STEP ---
         public BaseStateDTO RunStep(double dt, double[] currentState)
         {
-            // If dt changed externally, regenerate environment arrays to the new resolution
             if (Math.Abs(dt - _profileDt) > 1e-9)
             {
                 _profileDt = dt > 0 ? dt : 1.0;
@@ -250,25 +224,20 @@ namespace Web.Services.Scenarios
             double startEnergy = BatteryCapacity * (InitialBatteryPercent / 100.0);
             var state = currentState != null && currentState.Length == 1 ? currentState : new double[] { startEnergy };
 
-            // 1) Plan using forecast
             _useForecast = true;
             var plannedU = ILQR_Controller.Solve(state, Horizon, 10, actualDt, GetPhysicsModel(), this);
 
-            // -- Prevent planner from proposing negative grid (we do not support selling/export)
             if (plannedU != null && plannedU.Length >= 1)
             {
                 if (plannedU[0] < 0.0) plannedU[0] = 0.0;
             }
 
-            // 2) Convert planner output -> executed controls (apply physical limits, clamp negative grid)
             double plannedGrid = plannedU.ElementAtOrDefault(0);
             double plannedGen = plannedU.ElementAtOrDefault(1);
 
-            // Execution clamping
             double execGrid = plannedGrid;
-            // We disallow negative imports in execution
             execGrid = Math.Max(0.0, execGrid);
-            if (IsBlackout) execGrid = 0.0; // no import allowed in blackout (penalized heavily)
+            if (IsBlackout) execGrid = 0.0;
             execGrid = Math.Min(execGrid, MaxGridPower);
 
             double execGen = plannedGen;
@@ -278,18 +247,15 @@ namespace Web.Services.Scenarios
 
             var executedU = new double[] { execGrid, execGen };
 
-            // 3) Execute using actual solar & physics
             _useForecast = false;
             var nextState = GridStep(state, executedU, actualDt, _currentStepIndex);
 
-            // 4) Bookkeeping: compute real costs based on executed controls
             int safeT = Math.Min(_currentStepIndex, _demand.Length - 1);
             double realGridCost = execGrid * _price[safeT] * actualDt;
             double realGenCost = execGen * FuelCost * actualDt;
             double stepFinancialCost = realGridCost + realGenCost;
             _accumulatedFinancialCost += stepFinancialCost;
 
-            // 5) Save history (record executed values)
             _history.Add(new GridRecord(
                 _currentStepIndex * actualDt,
                 _demand[safeT],
@@ -310,12 +276,9 @@ namespace Web.Services.Scenarios
                 _genHistory.Add(execGen);
             }
 
-            // Return the planned state/control to the caller (for display or further processing).
-            // Note: visuals / csv / histories reflect the executed values.
             return new GridStateDTO { State = nextState, Control = plannedU };
         }
 
-        // --- CSV EXPORT ---
         public string GetCsv()
         {
             var sb = new StringBuilder();
@@ -349,8 +312,6 @@ namespace Web.Services.Scenarios
                     histGen[i] = 0;
                 }
             }
-
-            // CurrentStep is allowed to equal len (sim finished). JS will hide the dotted line when currentStep >= steps.
             int reportedStep = _currentStepIndex;
 
             return new GridVisuals
@@ -370,7 +331,7 @@ namespace Web.Services.Scenarios
         {
             if (string.IsNullOrEmpty(mode))
             {
-                // refresh / noop
+
             }
             else if (mode == "ToggleGen")
             {
@@ -420,7 +381,6 @@ namespace Web.Services.Scenarios
                 }
             }
 
-            // If profile resolution changed in other ways, ensure we re-generate or reapply
             int expectedSteps = Math.Max(2, (int)(24.0 / _profileDt) + 1);
             if (_baseDemand == null || _baseDemand.Length != expectedSteps)
             {

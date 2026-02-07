@@ -87,7 +87,6 @@
                     </div>
                 </section>
 
-                <!-- INFRASTRUCTURE -->
                 <section class="control-section">
                     <h3 class="section-title">Обладнання</h3>
 
@@ -148,7 +147,6 @@
                     </div>
                 </section>
 
-                <!-- ECONOMICS -->
                 <section class="control-section">
                     <h3 class="section-title">Економіка</h3>
 
@@ -235,7 +233,6 @@
                     </div>
                 </section>
 
-                <!-- ADVANCED / OPTIMIZER -->
                 <section class="control-section">
                     <h3 class="section-title">Плавність</h3>
 
@@ -264,7 +261,6 @@
                     </div>
                 </section>
 
-                <!-- TELEMETRY -->
                 @if (_visuals != null)
                 {
                     <div class="telemetry-panel">
@@ -290,7 +286,6 @@
                     </div>
                 }
 
-                <!-- EXPORT -->
                 <section class="control-section">
                     <h3 class="section-title">Експорт даних</h3>
                     <div class="control-group">
@@ -339,7 +334,6 @@
     {
         if (_timer != null || _disposed || Context == null) return;
 
-        // If already finished, reset first so Start always restarts
         if (_visuals != null && (_visuals.CurrentStep * Sim.Dt) >= 24.0)
         {
             await Reset();
@@ -383,7 +377,6 @@
 
     private async Task RunSingleStep()
     {
-        // If sim was finished, reset before running a single step so single-step can restart
         if (_visuals != null && (_visuals.CurrentStep * Sim.Dt) >= 24.0)
         {
             await Reset();
@@ -400,9 +393,12 @@
 
         if (double.TryParse(e.Value.ToString(), out var newDt) && newDt > 0)
         {
+            if (_visuals != null && _visuals.CurrentStep > 0)
+            {
+                await Reset();
+            }
             Sim.Dt = newDt;
 
-            // tell the scenario to regenerate at the new profile resolution
             Sim.HandleInteraction(0, 0, $"SetDt:{newDt}");
 
             await UpdateVisuals();
