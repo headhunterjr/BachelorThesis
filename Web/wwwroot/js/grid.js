@@ -161,6 +161,7 @@
     // LEGEND
     ctx.font = '12px Inter, sans-serif';
     let lx = startX + 20;
+    const legendY = padding - 15;
     const spacing = 20;
     const legendItems = [
         { text: "● Акумулятор", color: '#10B981' },
@@ -170,7 +171,7 @@
     ];
     legendItems.forEach(item => {
         ctx.fillStyle = item.color;
-        ctx.fillText(item.text, lx, padding);
+        ctx.fillText(item.text, lx, legendY);
         lx += ctx.measureText(item.text).width + spacing;
     });
 };

@@ -20,18 +20,34 @@ namespace Web.Services.Scenarios
         public double MaxGridPower { get; set; } = 100.0;
         public double BatteryEfficiency { get; set; } = 1.0; // kept linear & consistent with linearization
 
+        public double BatteryAttraction
+        {
+            get => _Q[0, 0];
+            set => _Q[0, 0] = value;
+        }
+
+        public double GridControlPenalty
+        {
+            get => _R[0, 0];
+            set => _R[0, 0] = value;
+        }
+
+        public double GenControlPenalty
+        {
+            get => _R[1, 1];
+            set => _R[1, 1] = value;
+        }
+
         public double FuelCost { get; set; } = 0.40;
         public double BasePrice { get; set; } = 0.10;
         public double PeakPrice { get; set; } = 0.50;
         public int PeakStartHour { get; set; } = 17;
         public int PeakEndHour { get; set; } = 21;
-        public double SellPriceRatio { get; set; } = 0.5; // not used for execution (we disallow negative grid execution)
 
         public double ConstraintWeight { get; set; } = 1000.0;
         public int Horizon { get; set; } = 12;
         public double InitialBatteryPercent { get; set; } = 50.0;
-        public double ForecastError { get; set; } = 0.20;
-        public double GridSmoothing { get; set; } = 0.05;
+        public double ForecastError { get; set; } = 0.0;
 
         // --- INTERNAL STATE ---
         private List<GridRecord> _history = new();
@@ -55,8 +71,18 @@ namespace Web.Services.Scenarios
         private double _accumulatedFinancialCost = 0;
         private int _currentStepIndex = 0;
 
-        // profile resolution used for generating arrays (set when dt changes)
         private double _profileDt = 1.0;
+
+        private double[,] _Q =
+            {
+                { 0.001 }
+            };
+
+        private double[,] _R =
+            {
+                { 0.008, 0 },
+                { 0, 0.008 }
+            };
 
         public GridScenario()
         {
@@ -149,12 +175,16 @@ namespace Web.Services.Scenarios
             double cost = 0;
 
             // Linear economic cost (simple and consistent)
-            // We treat gridP as positive = import. For the solver, negative grid will be penalized heavily below.
+            // We treat gridP as positive = import.
             cost += gridP * price * dt;
             cost += genP * FuelCost * dt;
 
-            // Quadratic smoothing on grid usage (to penalize spikes)
-            cost += GridSmoothing * gridP * gridP * dt;
+            //cost += _R[0, 0] * gridP * gridP * dt;
+            //cost += _R[1, 1] * genP * genP * dt;
+
+            double target = BatteryCapacity / 2.0;
+            double dev = E - target;
+            cost += _Q[0, 0] * dev * dev * dt;
 
             // Soft-box constraints for battery
             if (E < 0) cost += ConstraintWeight * Math.Exp(-E);
@@ -176,13 +206,6 @@ namespace Web.Services.Scenarios
                 cost += (ConstraintWeight / 10.0) * Math.Pow(Math.Abs(gridP) - MaxGridPower, 2);
             }
 
-            // Discourage negative grid (selling) in planning unless you explicitly want it;
-            // this is an extra soft penalty so solver won't plan to sell which we don't execute.
-            if (gridP < 0)
-            {
-                cost += ConstraintWeight * 100.0 * gridP * gridP;
-            }
-
             return cost;
         }
 
@@ -198,18 +221,19 @@ namespace Web.Services.Scenarios
             r[0] = price * dt; // grid marginal cost
             r[1] = FuelCost * dt; // generator marginal cost
 
-            // Hessians (regularization)
-            double smoothingHessian = GridSmoothing * 2.0 * dt;
-            Q[0, 0] = 0.1; // small battery center attraction
-            R[0, 0] = 0.001 + smoothingHessian; // grid control curvature
-            R[1, 1] = 0.001; // gen control curvature
+            R[0, 0] = 2.0 * _R[0, 0];
+            R[1, 1] = 2.0 * _R[1, 1];
+
+            double target = BatteryCapacity / 2.0;
+            double dev = x[0] - target;
+
+            // Gradient: 2 * Q * dev
+            q[0] = 2.0 * _Q[0, 0] * dev;
+            // Hessian: 2 * Q
+            Q[0, 0] = 2.0 * _Q[0, 0];
 
             if (!HasGenerator) R[1, 1] += 2 * ConstraintWeight * 100.0;
             if (IsBlackout) R[0, 0] += 2 * ConstraintWeight * 100.0;
-
-            // battery attraction toward middle
-            double target = BatteryCapacity / 2.0;
-            q[0] = 0.1 * (x[0] - target);
         }
 
         // --- SIMULATION STEP ---
@@ -230,13 +254,19 @@ namespace Web.Services.Scenarios
             _useForecast = true;
             var plannedU = ILQR_Controller.Solve(state, Horizon, 10, actualDt, GetPhysicsModel(), this);
 
+            // -- Prevent planner from proposing negative grid (we do not support selling/export)
+            if (plannedU != null && plannedU.Length >= 1)
+            {
+                if (plannedU[0] < 0.0) plannedU[0] = 0.0;
+            }
+
             // 2) Convert planner output -> executed controls (apply physical limits, clamp negative grid)
             double plannedGrid = plannedU.ElementAtOrDefault(0);
             double plannedGen = plannedU.ElementAtOrDefault(1);
 
             // Execution clamping
             double execGrid = plannedGrid;
-            // We disallow negative imports (no selling) in execution: clamp to >= 0
+            // We disallow negative imports in execution
             execGrid = Math.Max(0.0, execGrid);
             if (IsBlackout) execGrid = 0.0; // no import allowed in blackout (penalized heavily)
             execGrid = Math.Min(execGrid, MaxGridPower);

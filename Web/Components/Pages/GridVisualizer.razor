@@ -199,18 +199,6 @@
                                @bind-value="Context.FuelCost" @bind-value:event="oninput"
                                @onchange='() => ToggleConfig("Refresh")' />
                     </div>
-
-                    <div class="control-group">
-                        <label class="control-label">
-                            <span>Ціна продажу</span>
-                            <span class="control-value">@((Context.SellPriceRatio * 100).ToString("F0"))%</span>
-                        </label>
-                        <input type="range" class="form-range" min="0.0" max="1.0" step="0.05"
-                               @bind-value="Context.SellPriceRatio" @bind-value:event="oninput" />
-                        <div style="font-size: 0.7rem; color: var(--text-lighter); margin-top: 0.25rem;">
-                            Відсоток від ціни купівлі при продажу в мережу
-                        </div>
-                    </div>
                 </section>
 
                 <section class="control-section">
@@ -249,24 +237,30 @@
 
                 <!-- ADVANCED / OPTIMIZER -->
                 <section class="control-section">
-                    <h3 class="section-title">Оптимізатор</h3>
+                    <h3 class="section-title">Плавність</h3>
 
                     <div class="control-group">
-                        <label class="control-label">
-                            <span>Згладжування навантаження</span>
-                            <span class="control-value">@Context.GridSmoothing.ToString("F3")</span>
-                        </label>
-                        <input type="range" class="form-range" min="0.0" max="0.2" step="0.005"
-                               @bind-value="Context.GridSmoothing" @bind-value:event="oninput" />
-                        <div style="font-size: 0.7rem; color: var(--text-lighter); margin-top: 0.25rem;">
-                            Більше = плавніше (комфорт), Менше = різкіше (економія)
-                        </div>
+                        <label class="control-label">Використання мережі</label>
+                        <input type="number" class="form-control" min="0.000" max="10.0" step="0.001"
+                               @bind-value="Context.GridControlPenalty" @bind-value:event="onchange" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Використання генератора</label>
+                        <input type="number" class="form-control" min="0.000" max="10.0" step="0.001"
+                               @bind-value="Context.GenControlPenalty" @bind-value:event="onchange" />
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Утримання заряду</label>
+                        <input type="number" class="form-control" min="0.0" max="10.0" step="0.001"
+                               @bind-value="Context.BatteryAttraction" @bind-value:event="onchange" />
                     </div>
 
                     <div class="control-group">
                         <label class="control-label">Жорсткість обмежень</label>
                         <input type="number" class="form-control" step="100" min="100"
-                               @bind-value="Context.ConstraintWeight" @bind-value:event="oninput" />
+                               @bind-value="Context.ConstraintWeight" @bind-value:event="onchange" />
                     </div>
                 </section>
 
@@ -298,7 +292,7 @@
 
                 <!-- EXPORT -->
                 <section class="control-section">
-                    <h3 class="section-title">Експорт</h3>
+                    <h3 class="section-title">Експорт даних</h3>
                     <div class="control-group">
                         <button class="btn btn-sm btn-outline-primary" style="width: 100%" @onclick="DownloadData">
                             Завантажити результати (.csv)
