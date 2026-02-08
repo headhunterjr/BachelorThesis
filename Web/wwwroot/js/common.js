@@ -52,7 +52,7 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
         return { worldX: wx, worldY: wy, canvasX, canvasY };
     };
 
-    canvas.onmousedown = (e) => {
+    const handleMouseDown = (e) => {
         const { worldX, worldY, canvasX, canvasY } = toWorld(e.clientX, e.clientY);
 
         if (window.gameCanvas.setTargetMode[canvasId]) {
@@ -69,18 +69,74 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
         }
     };
 
-    canvas.onmousemove = (e) => {
-        if (e.buttons === 0) return; 
+    const handleMouseMove = (e) => {
+        if (e.buttons === 0) return;
         const { worldX, worldY } = toWorld(e.clientX, e.clientY);
         dotNetRef.invokeMethodAsync('HandleMouseMove', worldX, worldY);
     };
 
-    canvas.onmouseup = () => {
+    const handleMouseUp = () => {
         dotNetRef.invokeMethodAsync('HandleMouseUp');
     };
 
-    canvas.oncontextmenu = (e) => {
+    const handleContextMenu = (e) => {
         e.preventDefault();
+    };
+
+    let touchActive = false;
+
+    const handleTouchStart = (e) => {
+        e.preventDefault();
+        touchActive = true;
+
+        const touch = e.touches[0];
+        const { worldX, worldY, canvasX, canvasY } = toWorld(touch.clientX, touch.clientY);
+
+        if (window.gameCanvas.setTargetMode[canvasId]) {
+            window.gameCanvas.origins[canvasId] = { x: canvasX, y: canvasY };
+            window.gameCanvas.setTargetMode[canvasId] = false;
+            try { dotNetRef.invokeMethodAsync('Redraw'); } catch (e) { }
+            return;
+        }
+
+        dotNetRef.invokeMethodAsync('HandleMouseDown', worldX, worldY);
+    };
+
+    const handleTouchMove = (e) => {
+        e.preventDefault();
+        if (!touchActive) return;
+
+        const touch = e.touches[0];
+        const { worldX, worldY } = toWorld(touch.clientX, touch.clientY);
+        dotNetRef.invokeMethodAsync('HandleMouseMove', worldX, worldY);
+    };
+
+    const handleTouchEnd = (e) => {
+        e.preventDefault();
+        if (!touchActive) return;
+        touchActive = false;
+        dotNetRef.invokeMethodAsync('HandleMouseUp');
+    };
+
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('contextmenu', handleContextMenu);
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    canvas._eventHandlers = {
+        mousedown: handleMouseDown,
+        mousemove: handleMouseMove,
+        mouseup: handleMouseUp,
+        contextmenu: handleContextMenu,
+        touchstart: handleTouchStart,
+        touchmove: handleTouchMove,
+        touchend: handleTouchEnd,
+        touchcancel: handleTouchEnd
     };
 };
 
@@ -106,10 +162,19 @@ window.disposeCanvasEvents = (canvasId) => {
     const canvas = document.getElementById(canvasId);
     if (canvas) {
         if (canvas._cleanupResize) canvas._cleanupResize();
-        canvas.onmousedown = null;
-        canvas.onmousemove = null;
-        canvas.onmouseup = null;
-        canvas.oncontextmenu = null;
+
+        if (canvas._eventHandlers) {
+            const h = canvas._eventHandlers;
+            canvas.removeEventListener('mousedown', h.mousedown);
+            canvas.removeEventListener('mousemove', h.mousemove);
+            canvas.removeEventListener('mouseup', h.mouseup);
+            canvas.removeEventListener('contextmenu', h.contextmenu);
+            canvas.removeEventListener('touchstart', h.touchstart);
+            canvas.removeEventListener('touchmove', h.touchmove);
+            canvas.removeEventListener('touchend', h.touchend);
+            canvas.removeEventListener('touchcancel', h.touchcancel);
+            delete canvas._eventHandlers;
+        }
 
         delete window.gameCanvas.origins[canvasId];
         delete window.gameCanvas.setTargetMode[canvasId];

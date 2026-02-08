@@ -156,6 +156,13 @@
     margin: 0;
 }
 
+canvas {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
 .canvas-wrapper {
     flex: 1;
     display: flex;
