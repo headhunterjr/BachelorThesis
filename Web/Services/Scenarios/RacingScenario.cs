@@ -134,7 +134,8 @@ namespace Web.Services.Scenarios
         public string GetCsv()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Time,X,Y,Velocity,Theta,Acceleration,Steering,StepCost");
+            sb.Append("\uFEFF");
+            sb.AppendLine("Час,X,Y,Швидкість,Кут,Прискорення,Кермування,Вартість");
             foreach (var r in _carTrail)
             {
                 sb.AppendLine($"{r.Time:F2},{r.X:F4},{r.Y:F4},{r.Velocity:F4},{r.Theta:F4},{r.Acceleration:F4},{r.Steering:F4},{r.Cost:F4}");

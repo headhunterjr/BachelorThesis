@@ -282,7 +282,8 @@ namespace Web.Services.Scenarios
         public string GetCsv()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Hour,Demand(kW),Solar(kW),Price($/kWh),Battery(kWh),Grid(kW),Gen(kW),StepCost($)");
+            sb.Append("\uFEFF");
+            sb.AppendLine("Час,Споживання(kW),Сонце(kW),Тариф($/kWh),Акумулятор(kWh),Мережа(kW),Генератор(kW),Вартість($)");
             foreach (var r in _history)
             {
                 sb.AppendLine($"{r.Hour:F2},{r.Demand:F2},{r.Solar:F2},{r.Price:F2},{r.BatteryLevel:F2},{r.GridUsage:F2},{r.GenUsage:F2},{r.CurrentCost:F2}");

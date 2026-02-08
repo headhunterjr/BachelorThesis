@@ -425,8 +425,8 @@
     {
         if (Context == null || _disposed) return;
         string csv = Context.GetCsv();
-        string fileName = $"grid_data_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
-        await JS.InvokeVoidAsync("downloadCsv", fileName, csv);
+        string baseName = $"grid_data";
+        await JS.InvokeVoidAsync("downloadCsv", baseName, csv);
     }
 
     private async Task UpdateVisuals()

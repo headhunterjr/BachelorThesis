@@ -370,8 +370,8 @@
             return;
         }
         string csv = Context.GetCsv();
-        string fileName = $"racing_data_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
-        await JS.InvokeVoidAsync("downloadCsv", fileName, csv);
+        string baseName = $"racing_data";
+        await JS.InvokeVoidAsync("downloadCsv", baseName, csv);
     }
 
     private CarStateDTO MapBaseToCar(BaseStateDTO baseDto)
