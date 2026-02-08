@@ -109,6 +109,12 @@ namespace Web.Services.Scenarios
             _currentTime = 0.0;
         }
 
+        public void ClearHistory()
+        {
+            _history.Clear();
+            _currentTime = 0.0;
+        }
+
         public BaseStateDTO RunStep(double dt, double[] carState)
         {
             if (EnableObstacleMovement)

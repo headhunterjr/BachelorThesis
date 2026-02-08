@@ -329,6 +329,11 @@
             return;
         }
 
+        if (Context != null)
+        {
+            Context.ClearHistory();
+        }
+
         _timer = new Timer(100);
         _timer.Elapsed += async (s, e) =>
         {
