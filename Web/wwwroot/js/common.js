@@ -12,7 +12,9 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
         canvas.width = width;
         canvas.height = height;
         const visibleWorldWidth = 220.0;
-        window.gameCanvas.scale = width / visibleWorldWidth;
+        const isMobile = width < 640;
+        const baseScale = width / visibleWorldWidth;
+        window.gameCanvas.scale = isMobile ? baseScale * 1.5 : baseScale;
 
         if (!window.gameCanvas.setTargetMode[canvasId]) {
             window.gameCanvas.origins[canvasId] = { x: width / 2, y: height / 2 };
@@ -39,7 +41,7 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
         const rect = canvas.getBoundingClientRect();
 
         const visibleWorldWidth = 220.0;
-        const currentScale = rect.width / visibleWorldWidth;
+        const currentScale = window.gameCanvas.scale || (rect.width / visibleWorldWidth);
 
         const origin = window.gameCanvas.origins[canvasId] || { x: rect.width / 2, y: rect.height / 2 };
 

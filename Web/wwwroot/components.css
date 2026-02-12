@@ -890,13 +890,11 @@ canvas {
         gap: 0.15rem;
     }
 
-
     .control-buttons {
         justify-content: center;
         flex-direction: column;
         align-items: stretch;
     }
-
 
     .track-status {
         order: -1;
@@ -904,7 +902,6 @@ canvas {
         width: 100%;
         margin: 0 0 0.5rem 0;
     }
-
 
     .button-group,
     .btn-group,
@@ -914,7 +911,6 @@ canvas {
         margin: 0;
         flex-direction: column;
     }
-
 
         .button-group .btn,
         .btn-group .btn,
@@ -928,8 +924,36 @@ canvas {
     .control-buttons .btn-secondary {
         margin-left: 0 !important;
     }
-}
 
+    .visualizer-container {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .simulation-area {
+        flex: 0 0 auto !important;
+        display: flex;
+        flex-direction: column;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    .canvas-wrapper {
+        flex: 0 0 auto !important;
+        height: 30vh !important;
+        max-height: 280px;
+        min-height: 200px;
+    }
+
+    .control-panel {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow-y: auto;
+    }
+}
 
 @media (max-width: 480px) {
     .nav-container {
