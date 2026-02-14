@@ -164,6 +164,8 @@ namespace Web.Services.Scenarios
             cost += gridP * price * dt;
             cost += genP * FuelCost * dt;
 
+            cost += _R[0, 0] * gridP * gridP * dt;
+            cost += _R[1, 1] * genP * genP * dt;
 
             double target = BatteryCapacity / 2.0;
             double dev = E - target;
@@ -172,17 +174,22 @@ namespace Web.Services.Scenarios
             if (E < 0) cost += ConstraintWeight * Math.Exp(-E);
             if (E > BatteryCapacity) cost += ConstraintWeight * Math.Exp(E - BatteryCapacity);
 
-            if (genP < 0) cost += (ConstraintWeight * 10) * genP * genP;
-            if (genP > MaxGenPower) cost += (ConstraintWeight / 10.0) * Math.Pow(genP - MaxGenPower, 2);
+            if (genP < 0) cost += (ConstraintWeight * 100) * genP * genP * dt;
+            if (genP > MaxGenPower) cost += (ConstraintWeight / 10.0) * Math.Pow(genP - MaxGenPower, 2) * dt;
             if (!HasGenerator) cost += ConstraintWeight * 100.0 * genP * genP;
 
             if (IsBlackout)
             {
-                cost += ConstraintWeight * 100.0 * gridP * gridP;
+                cost += ConstraintWeight * 100.0 * gridP * gridP * dt;
             }
             else if (Math.Abs(gridP) > MaxGridPower)
             {
                 cost += (ConstraintWeight / 10.0) * Math.Pow(Math.Abs(gridP) - MaxGridPower, 2);
+            }
+
+            if (gridP < 0)
+            {
+                cost += ConstraintWeight * 100.0 * gridP * gridP * dt;
             }
 
             return cost;
@@ -199,17 +206,27 @@ namespace Web.Services.Scenarios
             r[0] = price * dt;
             r[1] = FuelCost * dt;
 
-            R[0, 0] = 2.0 * _R[0, 0];
-            R[1, 1] = 2.0 * _R[1, 1];
+            R[0, 0] = 2.0 * _R[0, 0] * dt;
+            R[1, 1] = 2.0 * _R[1, 1] * dt;
 
             double target = BatteryCapacity / 2.0;
             double dev = x[0] - target;
 
-            q[0] = 2.0 * _Q[0, 0] * dev;
-            Q[0, 0] = 2.0 * _Q[0, 0];
+            q[0] = 2.0 * _Q[0, 0] * dev * dt;
+            Q[0, 0] = 2.0 * _Q[0, 0] * dt;
 
             if (!HasGenerator) R[1, 1] += 2 * ConstraintWeight * 100.0;
             if (IsBlackout) R[0, 0] += 2 * ConstraintWeight * 100.0;
+            if (gridP < 0)
+            {
+                r[0] += 2.0 * ConstraintWeight * 100.0 * gridP * dt;
+                R[0, 0] += 2.0 * ConstraintWeight * 100.0 * dt;
+            }
+            if (genP < 0)
+            {
+                r[1] += 2.0 * ConstraintWeight * 100.0 * genP * dt;
+                R[1, 1] += 2.0 * ConstraintWeight * 100.0 * dt;
+            }
         }
 
         public BaseStateDTO RunStep(double dt, double[] currentState)
