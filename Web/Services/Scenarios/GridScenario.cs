@@ -14,6 +14,7 @@ namespace Web.Services.Scenarios
         public bool IsCloudy { get; set; } = false;
 
         public double BatteryCapacity { get; set; } = 100.0;
+        public double TargetBatteryPercent { get; set; } = 20.0;
         public double MaxGenPower { get; set; } = 50.0;
         public double MaxGridPower { get; set; } = 100.0;
         public double BatteryEfficiency { get; set; } = 1.0;
@@ -167,16 +168,24 @@ namespace Web.Services.Scenarios
             cost += _R[0, 0] * gridP * gridP * dt;
             cost += _R[1, 1] * genP * genP * dt;
 
-            double target = BatteryCapacity / 2.0;
-            double dev = E - target;
-            cost += _Q[0, 0] * dev * dev * dt;
+            double targetCharge = BatteryCapacity * (TargetBatteryPercent / 100.0);
+            double dev = E - targetCharge;
 
-            if (E < 0) cost += ConstraintWeight * Math.Exp(-E);
-            if (E > BatteryCapacity) cost += ConstraintWeight * Math.Exp(E - BatteryCapacity);
+            if (dev < 0)
+            {
+                cost += _Q[0, 0] * 3.0 * dev * dev;
+            }
+            else
+            {
+                cost += _Q[0, 0] * 0.5 * dev * dev;
+            }
+
+            if (E < 0) cost += ConstraintWeight * Math.Exp(-E) * dt;
+            if (E > BatteryCapacity) cost += ConstraintWeight * Math.Exp(E - BatteryCapacity) * dt;
 
             if (genP < 0) cost += (ConstraintWeight * 100) * genP * genP * dt;
             if (genP > MaxGenPower) cost += (ConstraintWeight / 10.0) * Math.Pow(genP - MaxGenPower, 2) * dt;
-            if (!HasGenerator) cost += ConstraintWeight * 100.0 * genP * genP;
+            if (!HasGenerator) cost += ConstraintWeight * 100 * genP * genP * dt;
 
             if (IsBlackout)
             {
@@ -184,7 +193,7 @@ namespace Web.Services.Scenarios
             }
             else if (Math.Abs(gridP) > MaxGridPower)
             {
-                cost += (ConstraintWeight / 10.0) * Math.Pow(Math.Abs(gridP) - MaxGridPower, 2);
+                cost += (ConstraintWeight / 10.0) * Math.Pow(Math.Abs(gridP) - MaxGridPower, 2) * dt;
             }
 
             if (gridP < 0)
@@ -202,6 +211,7 @@ namespace Web.Services.Scenarios
             double price = _price[safeT];
             double gridP = u.ElementAtOrDefault(0);
             double genP = u.ElementAtOrDefault(1);
+            double E = x[0];
 
             r[0] = price * dt;
             r[1] = FuelCost * dt;
@@ -209,14 +219,23 @@ namespace Web.Services.Scenarios
             R[0, 0] = 2.0 * _R[0, 0] * dt;
             R[1, 1] = 2.0 * _R[1, 1] * dt;
 
-            double target = BatteryCapacity / 2.0;
-            double dev = x[0] - target;
+            double targetCharge = BatteryCapacity * (TargetBatteryPercent / 100.0);
+            double dev = E - targetCharge;
 
-            q[0] = 2.0 * _Q[0, 0] * dev * dt;
-            Q[0, 0] = 2.0 * _Q[0, 0] * dt;
+            if (dev < 0)
+            {
+                q[0] = 2.0 * _Q[0, 0] * 3.0 * dev;
+                Q[0, 0] = 2.0 * _Q[0, 0] * 3.0;
+            }
+            else
+            {
+                q[0] = 2.0 * _Q[0, 0] * 0.5 * dev;
+                Q[0, 0] = 2.0 * _Q[0, 0] * 0.5;
+            }
 
-            if (!HasGenerator) R[1, 1] += 2 * ConstraintWeight * 100.0;
-            if (IsBlackout) R[0, 0] += 2 * ConstraintWeight * 100.0;
+            if (!HasGenerator) R[1, 1] += 2.0 * ConstraintWeight * 100.0 * dt;
+            if (IsBlackout) R[0, 0] += 2.0 * ConstraintWeight * 100.0 * dt;
+
             if (gridP < 0)
             {
                 r[0] += 2.0 * ConstraintWeight * 100.0 * gridP * dt;
@@ -244,9 +263,18 @@ namespace Web.Services.Scenarios
             _useForecast = true;
             var plannedU = ILQR_Controller.Solve(state, Horizon, 10, actualDt, GetPhysicsModel(), this);
 
-            if (plannedU != null && plannedU.Length >= 1)
+            if (plannedU != null)
             {
-                if (plannedU[0] < 0.0) plannedU[0] = 0.0;
+                if (plannedU.Length >= 1)
+                {
+                    if (plannedU[0] < 0.0) plannedU[0] = 0.0;
+                    if (plannedU[0] > MaxGridPower) plannedU[0] = MaxGridPower;
+                }
+                if (plannedU.Length >= 2)
+                {
+                    if (plannedU[1] < 0.0) plannedU[1] = 0.0;
+                    if (plannedU[1] > MaxGenPower) plannedU[1] = MaxGenPower;
+                }
             }
 
             double plannedGrid = plannedU.ElementAtOrDefault(0);
@@ -279,8 +307,8 @@ namespace Web.Services.Scenarios
                 _actualSolar[safeT],
                 _price[safeT],
                 state[0],
-                execGrid,
-                execGen,
+                plannedGrid,
+                plannedGen,
                 stepFinancialCost
             ));
 

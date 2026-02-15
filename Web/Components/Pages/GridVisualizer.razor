@@ -231,6 +231,15 @@
                         <input type="range" class="form-range" min="0" max="100" step="10"
                                @bind-value="Context.InitialBatteryPercent" @bind-value:event="oninput" />
                     </div>
+
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span>Цільовий заряд батареї</span>
+                            <span class="control-value">@Context.TargetBatteryPercent.ToString("F0")%</span>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="100" step="5"
+                               @bind-value="Context.TargetBatteryPercent" @bind-value:event="oninput" />
+                    </div>
                 </section>
 
                 <section class="control-section">
@@ -277,9 +286,9 @@
                                 </div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Баланс</div>
-                                <div class="telemetry-value" style="color: @(_visuals.CurrentCost > 0 ? "#F59E0B" : "#10B981"); grid-column: span 2;">
-                                    @(_visuals.CurrentCost >= 0 ? "+" : "")$@(_visuals.CurrentCost.ToString("F2"))
+                                <div class="telemetry-label">Вартість</div>
+                                <div class="telemetry-value" style="grid-column: span 2;">
+                                    @(_visuals.CurrentCost >= 0 ? "" : "-")@(_visuals.CurrentCost.ToString("F2"))
                                 </div>
                             </div>
                         </div>
