@@ -5,5 +5,6 @@
         public List<double[]> Track { get; set; } = new();
         public List<double[]> Trail { get; set; } = new();
         public List<double[]> RawPoints { get; set; } = new();
+        public double[]? StartPoint { get; set; }
     }
 }

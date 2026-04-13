@@ -10,10 +10,17 @@ namespace Web.Services.Scenarios
         private List<double[]> _processedPath = new();
 
         private Queue<RacingRecord> _carTrail = new();
+        private readonly object _trailLock = new object();
 
         private bool _isDrawing = false;
         private double _trackWidth = 10.0;
         private double _currentTime = 0.0;
+
+        private bool _hasLeftStartArea = false;
+
+        public double CurrentLapTime { get; private set; } = 0.0;
+        public double PreviousLapTime { get; private set; } = 0.0;
+        public double BestLapTime { get; private set; } = 0.0;
 
         public int Horizon { get; set; } = 30;
 
@@ -97,9 +104,16 @@ namespace Web.Services.Scenarios
         {
             _trackPoints.Clear();
             _processedPath.Clear();
-            _carTrail.Clear();
+            lock (_trailLock)
+            {
+                _carTrail.Clear();
+            }
             _isDrawing = false;
             _currentTime = 0.0;
+            CurrentLapTime = 0.0;
+            PreviousLapTime = 0.0;
+            BestLapTime = 0.0;
+            _hasLeftStartArea = false;
         }
 
         public BaseStateDTO RunStep(double dt, double[] carState)
@@ -113,19 +127,43 @@ namespace Web.Services.Scenarios
 
             double cost = Evaluate(carState, u, dt, 0);
 
-            _carTrail.Enqueue(new RacingRecord(
-                _currentTime,
-                carState[0], carState[1], carState[2], carState[3],
-                u.ElementAtOrDefault(0),
-                u.ElementAtOrDefault(1),
-                cost
-            ));
-            _currentTime += dt;
-
-            int minuteOfTrailData = (int)(1.0 / dt * 60.0);
-            if (_carTrail.Count > minuteOfTrailData)
+            lock (_trailLock)
             {
-                _carTrail.Dequeue();
+                _carTrail.Enqueue(new RacingRecord(
+                    _currentTime,
+                    carState[0], carState[1], carState[2], carState[3],
+                    u.ElementAtOrDefault(0),
+                    u.ElementAtOrDefault(1),
+                    cost
+                ));
+
+                int minuteOfTrailData = (int)(1.0 / dt * 60.0);
+                if (_carTrail.Count > minuteOfTrailData)
+                {
+                    _carTrail.Dequeue();
+                }
+            }
+            _currentTime += dt;
+            CurrentLapTime += dt;
+            if (_processedPath.Count > 0)
+            {
+                var startP = _processedPath[0];
+                double distToStart = Math.Sqrt(Math.Pow(carState[0] - startP[0], 2) + Math.Pow(carState[1] - startP[1], 2));
+
+                if (distToStart > 10.0)
+                {
+                    _hasLeftStartArea = true;
+                }
+                else if (_hasLeftStartArea && distToStart < 4.0)
+                {
+                    PreviousLapTime = CurrentLapTime;
+                    if (BestLapTime == 0.0 || PreviousLapTime < BestLapTime)
+                    {
+                        BestLapTime = PreviousLapTime;
+                    }
+                    CurrentLapTime = 0.0;
+                    _hasLeftStartArea = false;
+                }
             }
 
             return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
@@ -253,7 +291,10 @@ namespace Web.Services.Scenarios
             }
             else if (mode == "ClearTrail")
             {
-                _carTrail.Clear();
+                lock (_trailLock)
+                {
+                    _carTrail.Clear();
+                }
             }
         }
 
@@ -277,17 +318,27 @@ namespace Web.Services.Scenarios
                     _processedPath.Add(new double[] { p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t, 15.0, ang });
                 }
             }
+            CurrentLapTime = 0.0;
+            PreviousLapTime = 0.0;
+            BestLapTime = 0.0;
+            _hasLeftStartArea = false;
         }
 
         public object GetVisualizationData()
         {
-            var trailArrays = _carTrail.Select(r => new double[] { r.X, r.Y }).ToList();
+            List<double[]> trailArrays;
+
+            lock (_trailLock)
+            {
+                trailArrays = _carTrail.Select(r => new double[] { r.X, r.Y }).ToList();
+            }
 
             return new RacingVisuals
             {
                 Track = _processedPath,
                 Trail = trailArrays,
-                RawPoints = _isDrawing ? _trackPoints : new List<double[]>()
+                RawPoints = _isDrawing ? _trackPoints : new List<double[]>(),
+                StartPoint = _processedPath.Count > 0 ? _processedPath[0] : null
             };
         }
         public PhysicsModel GetPhysicsModel()

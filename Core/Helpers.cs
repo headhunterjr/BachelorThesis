@@ -141,16 +141,14 @@ namespace Core
         }
         public static double VectorQuadForm(double[,] vectorCol, double[,] matrix)
         {
-            // 1. Transpose the column vector to get a row vector (x^T)
+            // x^T
             double[,] vectorRow = Transpose(vectorCol);
 
-            // 2. Multiply Row * Matrix (x^T * Q)
+            // x^T * Q
             double[,] temp = MultiplyMatrices(vectorRow, matrix);
 
-            // 3. Multiply Result * Column ( (x^T * Q) * x )
+            // (x^T * Q) * x
             double[,] scalarMatrix = MultiplyMatrices(temp, vectorCol);
-
-            // The result is a 1x1 matrix, just return the single value
             return scalarMatrix[0, 0];
         }
     }

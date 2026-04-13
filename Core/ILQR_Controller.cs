@@ -15,7 +15,6 @@
 
             for (int iter = 0; iter < maxIterations; ++iter)
             {
-                // --- A. ROLLOUT ---
                 List<double[]> x_trajectory = new List<double[]>();
                 double[] xCurrent = (double[])xInit.Clone();
                 x_trajectory.Add(xCurrent);
@@ -24,12 +23,11 @@
 
                 for (int t = 0; t < horizon; ++t)
                 {
-                    // Pass 't' here
                     totalCost += costModel.Evaluate(xCurrent, u_trajectory[t], dt, t);
                     xCurrent = physicsModel.Step(xCurrent, u_trajectory[t], dt, t);
                     x_trajectory.Add(xCurrent);
                 }
-                // Terminal cost (t = horizon)
+
                 totalCost += costModel.Evaluate(xCurrent, new double[nu], dt, horizon);
 
                 if (totalCost < 1e-6)
@@ -37,7 +35,6 @@
                     break;
                 }
 
-                // --- B. LINEARIZE & QUADRATICIZE ---
                 var A_list = new List<double[,]>();
                 var B_list = new List<double[,]>();
                 var Q_list = new List<double[,]>();
@@ -61,7 +58,6 @@
 
                     double[] u_t = (t < horizon) ? u_trajectory[t] : new double[nu];
 
-                    // Pass 't' here as well
                     costModel.GetDerivatives(x_trajectory[t], u_t, dt, t, ref Qt, ref Rt, ref qt, ref rt);
 
                     Q_list.Add(Qt);
@@ -74,10 +70,8 @@
                     }
                 }
 
-                // --- C. SOLVE LQR ---
                 var gains = DynamicLQR.BackwardPass(A_list, B_list, Q_list, R_list, q_list, r_list, horizon);
 
-                // --- D. UPDATE CONTROLS ---
                 double bestCost = totalCost;
                 bool improved = false;
                 double[] alphas = { 1.0, 0.5, 0.25, 0.125, 0.0625 };
@@ -112,12 +106,10 @@
                         }
 
                         cand_u.Add(u_update);
-                        // Pass 't'
                         currentAlphaCost += costModel.Evaluate(xSim, u_update, dt, t);
                         xSim = physicsModel.Step(xSim, u_update, dt, t);
                         cand_x.Add(xSim);
                     }
-                    // Pass 'horizon' for terminal cost
                     currentAlphaCost += costModel.Evaluate(xSim, new double[nu], dt, horizon);
 
                     if (currentAlphaCost < bestCost)

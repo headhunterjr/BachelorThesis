@@ -155,6 +155,20 @@
                             <div class="telemetry-label">Кут</div>
                             <div class="telemetry-value">@(_currentCar.Theta.ToString("F2"))</div>
                         </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Поточний час</div>
+                            <div class="telemetry-value">@(Context.CurrentLapTime.ToString("F2")) с</div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Попереднє коло</div>
+                            <div class="telemetry-value">@(Context.PreviousLapTime > 0 ? Context.PreviousLapTime.ToString("F2") + " с" : "-")</div>
+                        </div>
+                        <div class="telemetry-item" style="grid-column: span 2; background: rgba(20, 184, 166, 0.1); border: 1px solid #14B8A6;">
+                            <div class="telemetry-label" style="color: #14B8A6;">Найкраще коло</div>
+                            <div class="telemetry-value" style="color: #14B8A6; font-weight: bold;">
+                                @(Context.BestLapTime > 0 ? Context.BestLapTime.ToString("F2") + " с" : "-")
+                            </div>
+                        </div>
                     </div>
                 </div>
             }
@@ -259,14 +273,24 @@
 
         var data = Sim.GetCurrentVisuals() as RacingVisuals;
         _trackExists = (data != null && data.Track != null && data.Track.Count > 0);
+        if (_trackExists && data != null && data.Track != null)
+        {
+            var startPoint = data.Track[0];
+            double startX = startPoint[0];
+            double startY = startPoint[1];
+            double startAngle = startPoint[3];
+            double startVelocity = 0.0;
 
+            Sim.SetState(new double[] { startX, startY, startVelocity, startAngle });
+            
+            Sim.HandleInteraction(0, 0, "ClearTrail");
+        }
         await DrawFrame();
     }
 
     [JSInvokable]
     public void HandleRightClick(double x, double y)
     {
-        // Not used in racing
     }
 
     private void ToggleSim()

@@ -98,6 +98,28 @@
         ctx.stroke();
     }
 
+    const startPoint = data.startPoint || data.StartPoint;
+    if (startPoint && track && track.length > 0) {
+        const sx = toScreenX(startPoint[0]);
+        const sy = toScreenY(startPoint[1]);
+        const ang = startPoint[3];
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(-ang);
+
+        ctx.strokeStyle = '#FBBF24';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([5, 5]);
+
+        ctx.beginPath();
+        ctx.moveTo(0, -10 * scale);
+        ctx.lineTo(0, 10 * scale);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
     if (trail && trail.length > 0) {
         ctx.strokeStyle = '#14B8A6';
         ctx.lineWidth = 2;

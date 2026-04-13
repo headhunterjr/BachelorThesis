@@ -4,12 +4,10 @@
     {
         public struct Gain
         {
-            public double[,] K; // Feedback Gain (Matrix)
-            public double[] k;  // Feedforward Gain (Vector)
+            public double[,] K;
+            public double[] k;
         }
 
-        // Backward pass expects Q_list and q_list of length horizon+1 (terminal included)
-        // R_list and r_list of length horizon
         public static List<Gain> BackwardPass(List<double[,]> A_list, List<double[,]> B_list, List<double[,]> Q_list, List<double[,]> R_list, List<double[]> q_list, List<double[]> r_list, int horizon)
         {
             List<Gain> gains = new List<Gain>(horizon);
@@ -17,7 +15,6 @@
             int nx = Q_list[horizon].GetLength(0);
             int nu = R_list[0].GetLength(0);
 
-            // Terminal cost
             double[,] V_xx = (double[,])Q_list[horizon].Clone();
             double[] V_x = (double[])q_list[horizon].Clone();
 
@@ -44,7 +41,6 @@
                 var term2 = Helpers.MultiplyMatrices(Helpers.MultiplyMatrices(B_T, V_xx), B);
                 var Q_uu = Helpers.AddMatrices(R, term2);
 
-                // Regularize for numerical stability
                 for (int i = 0; i < Q_uu.GetLength(0); ++i) Q_uu[i, i] += 1e-6;
 
                 // Q_ux = B^T * V_xx * A
@@ -60,7 +56,6 @@
                 var term4 = Helpers.MultiplyMatrices(Helpers.MultiplyMatrices(A_T, V_xx), A);
                 var Q_xx = Helpers.AddMatrices(Q, term4);
 
-                // Gains
                 var Q_uu_inv = Helpers.Inverse(Q_uu);
 
                 var Qu_col = Helpers.ToColumnVector(Q_u);
@@ -76,7 +71,6 @@
 
                 gains.Insert(0, new Gain { K = K, k = k });
 
-                // Update V_x and V_xx
                 var K_T = Helpers.Transpose(K);
                 var k_col = Helpers.ToColumnVector(k);
 

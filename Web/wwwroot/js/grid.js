@@ -58,7 +58,6 @@
     const toX = (i) => startX + (i / (steps - 1)) * graphW;
     const toY = (val) => startY - (val / maxPower) * graphH;
 
-    // Draw axes
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -68,7 +67,6 @@
     ctx.lineTo(startX + graphW, startY);
     ctx.stroke();
 
-    // Y-axis labels (show scale)
     ctx.fillStyle = '#94A3B8';
     ctx.font = `${yAxisFontSize}px Inter, sans-serif`;
     ctx.textAlign = 'right';
@@ -79,7 +77,6 @@
     });
     ctx.textAlign = 'left';
 
-    // SOLAR (filled area)
     if (data.solarProfile) {
         ctx.fillStyle = 'rgba(251, 191, 36, 0.12)';
         ctx.beginPath();
@@ -90,7 +87,6 @@
         ctx.fill();
     }
 
-    // PLANNED GENERATOR (dashed orange)
     if (data.plannedGen) {
         const limit = data.currentStep >= (steps - 1) ? data.plannedGen.length : data.currentStep + 1;
         const visible = Math.min(limit, data.plannedGen.length);
@@ -111,7 +107,6 @@
         ctx.setLineDash([]);
     }
 
-    // PLANNED GRID (blue)
     if (data.plannedGrid) {
         const limit = data.currentStep >= (steps - 1) ? data.plannedGrid.length : data.currentStep + 1;
         const visible = Math.min(limit, data.plannedGrid.length);
@@ -130,7 +125,6 @@
         ctx.stroke();
     }
 
-    // DEMAND (purple - full profile)
     if (data.demandProfile) {
         ctx.strokeStyle = 'rgba(192, 132, 252, 0.4)';
         ctx.lineWidth = 4;
@@ -144,7 +138,6 @@
         ctx.stroke();
     }
 
-    // BATTERY (green with glow)
     if (data.plannedBattery) {
         const limit = data.currentStep >= (steps - 1) ? data.plannedBattery.length : data.currentStep + 1;
         const visible = Math.min(limit, data.plannedBattery.length);
@@ -165,7 +158,6 @@
         ctx.shadowBlur = 0;
     }
 
-    // TIME INDICATOR (vertical dashed line)
     if (data.currentStep >= 0 && data.currentStep < steps - 1) {
         const xNow = toX(data.currentStep);
         ctx.strokeStyle = '#F1F5F9';
@@ -188,7 +180,6 @@
         ctx.fillText(timeLabel, xNow + 5, topPadding + 10);
     }
 
-    // PRICE BARS (at bottom)
     const barHeight = isMobile ? 8 : 10;
     const barY = startY + (isMobile ? 10 : 15);
     if (data.priceProfile) {
@@ -197,17 +188,16 @@
             const x = toX(i);
             const w = (graphW / (steps - 1)) + 1;
 
-            let color = '#334155'; // Base price (dark gray)
-            if (price > 0.15) color = '#F59E0B'; // Medium price (amber)
-            if (price > 0.25) color = '#EF4444'; // Peak price (red)
-            if (price > 5.0) color = '#000000';  // Blackout (black)
+            let color = '#334155';
+            if (price > 0.15) color = '#F59E0B';
+            if (price > 0.25) color = '#EF4444';
+            if (price > 5.0) color = '#000000';
 
             ctx.fillStyle = color;
             ctx.fillRect(x, barY, w, barHeight);
         }
     }
 
-    // LEGEND
     ctx.font = `${legendFontSize}px Inter, sans-serif`;
     const legendY = topPadding - (isMobile ? 12 : 15);
 
