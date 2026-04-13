@@ -102,33 +102,33 @@ namespace Web.Services.Scenarios
 
         public void Reset()
         {
-            _trackPoints.Clear();
-            _processedPath.Clear();
             lock (_trailLock)
             {
+                _trackPoints.Clear();
+                _processedPath.Clear();
                 _carTrail.Clear();
+                _isDrawing = false;
+                _currentTime = 0.0;
+                CurrentLapTime = 0.0;
+                PreviousLapTime = 0.0;
+                BestLapTime = 0.0;
+                _hasLeftStartArea = false;
             }
-            _isDrawing = false;
-            _currentTime = 0.0;
-            CurrentLapTime = 0.0;
-            PreviousLapTime = 0.0;
-            BestLapTime = 0.0;
-            _hasLeftStartArea = false;
         }
 
         public BaseStateDTO RunStep(double dt, double[] carState)
         {
-            if (_processedPath.Count == 0)
-            {
-                return new CarStateDTO { Control = new double[] { 0.0, 0.0 } };
-            }
-
-            var u = ILQR_Controller.Solve(carState, 30, 5, dt, GetPhysicsModel(), this);
-
-            double cost = Evaluate(carState, u, dt, 0);
-
             lock (_trailLock)
             {
+                if (_processedPath.Count == 0)
+                {
+                    return new CarStateDTO { Control = new double[] { 0.0, 0.0 } };
+                }
+
+                var u = ILQR_Controller.Solve(carState, 30, 5, dt, GetPhysicsModel(), this);
+
+                double cost = Evaluate(carState, u, dt, 0);
+
                 _carTrail.Enqueue(new RacingRecord(
                     _currentTime,
                     carState[0], carState[1], carState[2], carState[3],
@@ -142,31 +142,31 @@ namespace Web.Services.Scenarios
                 {
                     _carTrail.Dequeue();
                 }
-            }
-            _currentTime += dt;
-            CurrentLapTime += dt;
-            if (_processedPath.Count > 0)
-            {
-                var startP = _processedPath[0];
-                double distToStart = Math.Sqrt(Math.Pow(carState[0] - startP[0], 2) + Math.Pow(carState[1] - startP[1], 2));
+                _currentTime += dt;
+                CurrentLapTime += dt;
+                if (_processedPath.Count > 0)
+                {
+                    var startP = _processedPath[0];
+                    double distToStart = Math.Sqrt(Math.Pow(carState[0] - startP[0], 2) + Math.Pow(carState[1] - startP[1], 2));
 
-                if (distToStart > 10.0)
-                {
-                    _hasLeftStartArea = true;
-                }
-                else if (_hasLeftStartArea && distToStart < 4.0)
-                {
-                    PreviousLapTime = CurrentLapTime;
-                    if (BestLapTime == 0.0 || PreviousLapTime < BestLapTime)
+                    if (distToStart > 10.0)
                     {
-                        BestLapTime = PreviousLapTime;
+                        _hasLeftStartArea = true;
                     }
-                    CurrentLapTime = 0.0;
-                    _hasLeftStartArea = false;
+                    else if (_hasLeftStartArea && distToStart < 4.0)
+                    {
+                        PreviousLapTime = CurrentLapTime;
+                        if (BestLapTime == 0.0 || PreviousLapTime < BestLapTime)
+                        {
+                            BestLapTime = PreviousLapTime;
+                        }
+                        CurrentLapTime = 0.0;
+                        _hasLeftStartArea = false;
+                    }
                 }
-            }
 
-            return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
+                return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
+            }
         }
 
         public string GetCsv()
@@ -304,24 +304,27 @@ namespace Web.Services.Scenarios
             {
                 return;
             }
-            _trackPoints.Add(_trackPoints[0]);
-            _processedPath.Clear();
-            for (int i = 0; i < _trackPoints.Count - 1; ++i)
+            lock (_trailLock)
             {
-                var p1 = _trackPoints[i]; var p2 = _trackPoints[i + 1];
-                double dist = Math.Sqrt(Math.Pow(p2[0] - p1[0], 2) + Math.Pow(p2[1] - p1[1], 2));
-                int steps = Math.Max(1, (int)(dist / 0.5));
-                for (int s = 0; s < steps; ++s)
+                _trackPoints.Add(_trackPoints[0]);
+                _processedPath.Clear();
+                for (int i = 0; i < _trackPoints.Count - 1; ++i)
                 {
-                    double t = (double)s / steps;
-                    double ang = Math.Atan2(p2[1] - p1[1], p2[0] - p1[0]);
-                    _processedPath.Add(new double[] { p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t, 15.0, ang });
+                    var p1 = _trackPoints[i]; var p2 = _trackPoints[i + 1];
+                    double dist = Math.Sqrt(Math.Pow(p2[0] - p1[0], 2) + Math.Pow(p2[1] - p1[1], 2));
+                    int steps = Math.Max(1, (int)(dist / 0.5));
+                    for (int s = 0; s < steps; ++s)
+                    {
+                        double t = (double)s / steps;
+                        double ang = Math.Atan2(p2[1] - p1[1], p2[0] - p1[0]);
+                        _processedPath.Add(new double[] { p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t, 15.0, ang });
+                    }
                 }
+                CurrentLapTime = 0.0;
+                PreviousLapTime = 0.0;
+                BestLapTime = 0.0;
+                _hasLeftStartArea = false;
             }
-            CurrentLapTime = 0.0;
-            PreviousLapTime = 0.0;
-            BestLapTime = 0.0;
-            _hasLeftStartArea = false;
         }
 
         public object GetVisualizationData()
