@@ -1,4 +1,17 @@
-﻿window.drawRacing = (canvasId, car, data) => {
+﻿window.lastRacingData = window.lastRacingData || {};
+
+window.drawRacing = (canvasId, car, data) => {
+    window.lastRacingData[canvasId] = { car, data };
+
+    if (window.gameCanvas && !window.gameCanvas.localRedraw[canvasId]) {
+        window.gameCanvas.localRedraw[canvasId] = () => {
+            const cached = window.lastRacingData[canvasId];
+            if (cached) {
+                window.drawRacing(canvasId, cached.car, cached.data);
+            }
+        };
+    }
+
     const { canvas, ctx } = window.clearCanvas(canvasId);
 
     const scale = window.gameCanvas.scale;
@@ -167,5 +180,37 @@
         ctx.fill();
 
         ctx.restore();
+    }
+
+    if (window.gameCanvas && window.gameCanvas.clientPoints && window.gameCanvas.clientPoints[canvasId]) {
+        const pts = window.gameCanvas.clientPoints[canvasId];
+        if (pts.length > 0) {
+            ctx.strokeStyle = '#7C3AED';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            pts.forEach((p, index) => {
+                const sx = toScreenX(p.x);
+                const sy = toScreenY(p.y);
+                if (index === 0) {
+                    ctx.moveTo(sx, sy);
+                }
+                else {
+                    ctx.lineTo(sx, sy);
+                }
+            });
+            ctx.stroke();
+
+            ctx.fillStyle = '#7C3AED';
+            pts.forEach((p) => {
+                const sx = toScreenX(p.x);
+                const sy = toScreenY(p.y);
+                ctx.beginPath();
+                ctx.arc(sx, sy, 4, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+        }
     }
 };

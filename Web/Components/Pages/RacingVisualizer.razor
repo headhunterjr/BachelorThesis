@@ -207,6 +207,7 @@
         {
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initCanvasEvents", "raceCanvas", _objRef);
+            await JS.InvokeVoidAsync("setClientSideDrawing", "raceCanvas", true);
             await DrawFrame();
         }
     }
@@ -226,13 +227,41 @@
     }
 
     [JSInvokable]
-    public async Task HandleMouseDown(double x, double y)
+    public async Task HandlePathDrawn(double[][] points)
     {
-        if (_disposed) 
+        if (_disposed || _isRunning || points == null || points.Length == 0) 
         {
             return;
         }
-        if (_isRunning)
+
+        Sim.HandleInteraction(points[0][0], points[0][1], "StartDraw");
+        for (int i = 1; i < points.Length; i++)
+        {
+            Sim.HandleInteraction(points[i][0], points[i][1], "Drawing");
+        }
+        Sim.HandleInteraction(0, 0, "EndDraw");
+
+        var data = Sim.GetCurrentVisuals() as RacingVisuals;
+        _trackExists = (data != null && data.Track != null && data.Track.Count > 0);
+        if (_trackExists && data != null && data.Track != null)
+        {
+            var startPoint = data.Track[0];
+            double startX = startPoint[0];
+            double startY = startPoint[1];
+            double startAngle = startPoint[3];
+            double startVelocity = 0.0;
+
+            Sim.SetState(new double[] { startX, startY, startVelocity, startAngle });
+
+            Sim.HandleInteraction(0, 0, "ClearTrail");
+        }
+        await DrawFrame();
+    }
+
+    [JSInvokable]
+    public async Task HandleMouseDown(double x, double y)
+    {
+        if (_disposed || _isRunning) 
         {
             return;
         }
@@ -244,11 +273,7 @@
     [JSInvokable]
     public async Task HandleMouseMove(double x, double y)
     {
-        if (_disposed) 
-        {
-            return;
-        }
-        if (_isRunning)
+        if (_disposed || _isRunning) 
         {
             return;
         }
@@ -260,11 +285,7 @@
     [JSInvokable]
     public async Task HandleMouseUp()
     {
-        if (_disposed) 
-        {
-            return;
-        }
-        if (_isRunning)
+        if (_disposed || _isRunning)
         {
             return;
         }
@@ -282,7 +303,7 @@
             double startVelocity = 0.0;
 
             Sim.SetState(new double[] { startX, startY, startVelocity, startAngle });
-            
+
             Sim.HandleInteraction(0, 0, "ClearTrail");
         }
         await DrawFrame();
@@ -307,11 +328,7 @@
 
     private void Start()
     {
-        if (!_trackExists)
-        {
-            return;
-        }
-        if (_timer != null)
+        if (!_trackExists || _timer != null) 
         {
             return;
         }
@@ -389,7 +406,7 @@
 
     private async Task DownloadData()
     {
-        if (Context == null || _disposed)
+        if (Context == null || _disposed) 
         {
             return;
         }

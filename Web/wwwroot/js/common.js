@@ -1,7 +1,10 @@
 ﻿window.gameCanvas = {
     scale: 4.5,
     origins: {},
-    setTargetMode: {}
+    setTargetMode: {},
+    clientDrawingMode: {},
+    clientPoints: {},
+    localRedraw: {}
 };
 
 window.initCanvasEvents = (canvasId, dotNetRef) => {
@@ -66,7 +69,15 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
 
         if (e.button === 2) {
             dotNetRef.invokeMethodAsync('HandleRightClick', worldX, worldY);
-        } else {
+        }
+        else {
+            if (window.gameCanvas.clientDrawingMode[canvasId]) {
+                window.gameCanvas.clientPoints[canvasId] = [{ x: worldX, y: worldY }];
+                if (window.gameCanvas.localRedraw[canvasId]) {
+                    window.gameCanvas.localRedraw[canvasId]();
+                }
+                return;
+            }
             dotNetRef.invokeMethodAsync('HandleMouseDown', worldX, worldY);
         }
     };
@@ -74,10 +85,33 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
     const handleMouseMove = (e) => {
         if (e.buttons === 0) return;
         const { worldX, worldY } = toWorld(e.clientX, e.clientY);
+
+        if (window.gameCanvas.clientDrawingMode[canvasId] && e.buttons === 1) {
+            if (!window.gameCanvas.clientPoints[canvasId]) {
+                window.gameCanvas.clientPoints[canvasId] = [];
+            }
+            window.gameCanvas.clientPoints[canvasId].push({ x: worldX, y: worldY });
+            if (window.gameCanvas.localRedraw[canvasId]) {
+                window.gameCanvas.localRedraw[canvasId]();
+            }
+            return;
+        }
+
         dotNetRef.invokeMethodAsync('HandleMouseMove', worldX, worldY);
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
+        if (e && e.button === 0 && window.gameCanvas.clientDrawingMode[canvasId]) {
+            const points = window.gameCanvas.clientPoints[canvasId];
+            if (points && points.length > 0) {
+                dotNetRef.invokeMethodAsync('HandlePathDrawn', points.map(p => [p.x, p.y]));
+            }
+            window.gameCanvas.clientPoints[canvasId] = [];
+            if (window.gameCanvas.localRedraw[canvasId]) {
+                window.gameCanvas.localRedraw[canvasId]();
+            }
+            return;
+        }
         dotNetRef.invokeMethodAsync('HandleMouseUp');
     };
 
@@ -101,6 +135,14 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
             return;
         }
 
+        if (window.gameCanvas.clientDrawingMode[canvasId]) {
+            window.gameCanvas.clientPoints[canvasId] = [{ x: worldX, y: worldY }];
+            if (window.gameCanvas.localRedraw[canvasId]) {
+                window.gameCanvas.localRedraw[canvasId]();
+            }
+            return;
+        }
+
         dotNetRef.invokeMethodAsync('HandleMouseDown', worldX, worldY);
     };
 
@@ -110,6 +152,18 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
 
         const touch = e.touches[0];
         const { worldX, worldY } = toWorld(touch.clientX, touch.clientY);
+
+        if (window.gameCanvas.clientDrawingMode[canvasId]) {
+            if (!window.gameCanvas.clientPoints[canvasId]) {
+                window.gameCanvas.clientPoints[canvasId] = [];
+            }
+            window.gameCanvas.clientPoints[canvasId].push({ x: worldX, y: worldY });
+            if (window.gameCanvas.localRedraw[canvasId]) {
+                window.gameCanvas.localRedraw[canvasId]();
+            }
+            return;
+        }
+
         dotNetRef.invokeMethodAsync('HandleMouseMove', worldX, worldY);
     };
 
@@ -117,6 +171,19 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
         e.preventDefault();
         if (!touchActive) return;
         touchActive = false;
+
+        if (window.gameCanvas.clientDrawingMode[canvasId]) {
+            const points = window.gameCanvas.clientPoints[canvasId];
+            if (points && points.length > 0) {
+                dotNetRef.invokeMethodAsync('HandlePathDrawn', points.map(p => [p.x, p.y]));
+            }
+            window.gameCanvas.clientPoints[canvasId] = [];
+            if (window.gameCanvas.localRedraw[canvasId]) {
+                window.gameCanvas.localRedraw[canvasId]();
+            }
+            return;
+        }
+
         dotNetRef.invokeMethodAsync('HandleMouseUp');
     };
 
@@ -140,6 +207,10 @@ window.initCanvasEvents = (canvasId, dotNetRef) => {
         touchend: handleTouchEnd,
         touchcancel: handleTouchEnd
     };
+};
+
+window.setClientSideDrawing = (canvasId, enabled) => {
+    window.gameCanvas.clientDrawingMode[canvasId] = !!enabled;
 };
 
 window.setCanvasSetTargetMode = (canvasId, enabled) => {
@@ -180,6 +251,9 @@ window.disposeCanvasEvents = (canvasId) => {
 
         delete window.gameCanvas.origins[canvasId];
         delete window.gameCanvas.setTargetMode[canvasId];
+        delete window.gameCanvas.clientDrawingMode[canvasId];
+        delete window.gameCanvas.clientPoints[canvasId];
+        delete window.gameCanvas.localRedraw[canvasId];
     }
 };
 
