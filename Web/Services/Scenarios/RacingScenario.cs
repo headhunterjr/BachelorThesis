@@ -16,6 +16,8 @@ namespace Web.Services.Scenarios
         private double _trackWidth = 10.0;
         private double _currentTime = 0.0;
 
+        private double _lastAlongTrack = 0.0;
+        private double _startLineAngle = 0.0;
         private bool _hasLeftStartArea = false;
 
         public double CurrentLapTime { get; private set; } = 0.0;
@@ -113,6 +115,7 @@ namespace Web.Services.Scenarios
                 PreviousLapTime = 0.0;
                 BestLapTime = 0.0;
                 _hasLeftStartArea = false;
+                _lastAlongTrack = 0.0;
             }
         }
 
@@ -147,22 +150,31 @@ namespace Web.Services.Scenarios
                 if (_processedPath.Count > 0)
                 {
                     var startP = _processedPath[0];
-                    double distToStart = Math.Sqrt(Math.Pow(carState[0] - startP[0], 2) + Math.Pow(carState[1] - startP[1], 2));
 
-                    if (distToStart > 10.0)
-                    {
+                    double dx = carState[0] - startP[0];
+                    double dy = carState[1] - startP[1];
+
+                    double alongTrack = dx * Math.Cos(_startLineAngle) + dy * Math.Sin(_startLineAngle);
+                    double acrossTrack = -dx * Math.Sin(_startLineAngle) + dy * Math.Cos(_startLineAngle);
+
+                    bool withinLateralBounds = Math.Abs(acrossTrack) < _trackWidth * 3.0;
+
+                    if (!_hasLeftStartArea && alongTrack > 15.0)
                         _hasLeftStartArea = true;
-                    }
-                    else if (_hasLeftStartArea && distToStart < 4.0)
+
+                    if (_hasLeftStartArea
+                        && withinLateralBounds
+                        && _lastAlongTrack < 0.0
+                        && alongTrack >= 0.0)
                     {
                         PreviousLapTime = CurrentLapTime;
                         if (BestLapTime == 0.0 || PreviousLapTime < BestLapTime)
-                        {
                             BestLapTime = PreviousLapTime;
-                        }
                         CurrentLapTime = 0.0;
                         _hasLeftStartArea = false;
                     }
+
+                    _lastAlongTrack = alongTrack;
                 }
 
                 return new CarStateDTO { Control = new double[] { u.ElementAtOrDefault(0), u.ElementAtOrDefault(1) } };
@@ -275,7 +287,14 @@ namespace Web.Services.Scenarios
         {
             if (mode == "StartDraw")
             {
-                _trackPoints.Clear(); _processedPath.Clear(); _isDrawing = true; _trackPoints.Add(new double[] { x, y });
+                _trackPoints.Clear(); 
+                _processedPath.Clear(); 
+                _isDrawing = true; 
+                _trackPoints.Add(new double[] { x, y });
+                lock (_trailLock)
+                {
+                    _carTrail.Clear();
+                }
             }
             else if (mode == "Drawing" && _isDrawing)
             {
@@ -287,7 +306,8 @@ namespace Web.Services.Scenarios
             }
             else if (mode == "EndDraw")
             {
-                _isDrawing = false; ProcessTrack();
+                _isDrawing = false; 
+                ProcessTrack();
             }
             else if (mode == "ClearTrail")
             {
@@ -320,10 +340,15 @@ namespace Web.Services.Scenarios
                         _processedPath.Add(new double[] { p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t, 15.0, ang });
                     }
                 }
+                int window = Math.Min(10, _processedPath.Count / 2);
+                var p0 = _processedPath[0];
+                var pN = _processedPath[window];
+                _startLineAngle = Math.Atan2(pN[1] - p0[1], pN[0] - p0[0]);
                 CurrentLapTime = 0.0;
                 PreviousLapTime = 0.0;
                 BestLapTime = 0.0;
                 _hasLeftStartArea = false;
+                _lastAlongTrack = 0.0;
             }
         }
 
